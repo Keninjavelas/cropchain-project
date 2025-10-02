@@ -1,0 +1,21 @@
+CREATE DATABASE IF NOT EXISTS cropchain;
+USE cropchain;
+
+CREATE TABLE IF NOT EXISTS products (
+    id VARCHAR(255) NOT NULL,
+    type VARCHAR(255) NOT NULL,
+    farmer_name VARCHAR(255) NOT NULL,
+    description TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id)
+);
+
+CREATE TABLE IF NOT EXISTS documents (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    product_id VARCHAR(255) NOT NULL,
+    ipfs_hash VARCHAR(255) NOT NULL,
+    file_name VARCHAR(255) NOT NULL,
+    uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+);
+
