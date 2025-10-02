@@ -1,6 +1,6 @@
 FROM node:18-bullseye
 
-# Install prerequisites for Hyperledger Fabric
+# Install prerequisites as root
 RUN apt-get update && apt-get install -y \
     build-essential \
     curl \
@@ -12,20 +12,22 @@ RUN apt-get update && apt-get install -y \
 RUN curl -L https://golang.org/dl/go1.19.linux-amd64.tar.gz | tar -C /usr/local -xz
 ENV PATH=$PATH:/usr/local/go/bin
 
-# Install Fabric binaries and docker images
-ENV FABRIC_VERSION=2.2.0
-RUN curl -sSL https://raw.githubusercontent.com/hyperledger/fabric/main/scripts/install-fabric.sh | bash -s -- -f ${FABRIC_VERSION} -d ${FABRIC_VERSION} -b ${FABRIC_VERSION}
-
 # Set working directory
 WORKDIR /workspace
 
-# Copy project files
+# Copy project files (still as root to ensure they are there)
 COPY . .
 
-# Grant execute permissions to the setup script
-RUN chmod +x /workspace/scripts/setup-fabric.sh
+# --- PERMISSION FIX ---
+# Create a non-root user 'node' and its home directory.
+# Then, grant this new user ownership of the workspace directory.
+RUN useradd --create-home --shell /bin/bash node && \
+    chown -R node:node /workspace
+
+# Switch to the non-root user for all subsequent operations
+USER node
 
 # Expose the application port
 EXPOSE 3000
 
-# The command to start the service will be handled by docker-compose.yml
+# The command to start the service is handled by docker-compose.yml
