@@ -1,11 +1,17 @@
 {
   "name": "CropChain Dev Environment",
+  // Use the docker-compose file to define the services.
   "dockerComposeFile": [
     "../docker-compose.yml"
   ],
+  // The service to connect VS Code to. This MUST match the service name in docker-compose.yml.
   "service": "app",
+  // The folder inside the service's container where the code will be.
   "workspaceFolder": "/workspace",
-  // Configure tool-specific properties.
+  // Use 'postCreateCommand' to run setup commands ONCE after the container is created.
+  // This is more reliable than using the 'command' in docker-compose for one-time setup.
+  "postCreateCommand": "npm install && cd ui && npm install && npm run build && cd ..",
+  // Customizations for VS Code within the Codespace.
   "customizations": {
     "vscode": {
       "extensions": [
@@ -16,18 +22,10 @@
       ]
     }
   },
-  // Set up ports
+  // Ensure the app port is forwarded.
   "forwardPorts": [
     3000
   ],
-  "portsAttributes": {
-    "3000": {
-      "label": "Application",
-      "onAutoForward": "openBrowser"
-    }
-  },
-  // Use 'postCreateCommand' to run commands after the container is created.
-  "postCreateCommand": "echo 'Codespace ready. Run `npm install && cd ui && npm install && npm run build && cd ..` then `npm start` to begin.'",
-  // Comment out connect as root instead. More info: https://aka.ms/vscode-remote/containers/non-root.
+  // Specify the user for VS Code to connect as.
   "remoteUser": "node"
 }
