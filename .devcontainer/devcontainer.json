@@ -1,17 +1,12 @@
 {
   "name": "CropChain Dev Environment",
-  // Use the docker-compose file to define the services.
   "dockerComposeFile": [
     "../docker-compose.yml"
   ],
-  // The service to connect VS Code to. This MUST match the service name in docker-compose.yml.
   "service": "app",
-  // The folder inside the service's container where the code will be.
   "workspaceFolder": "/workspace",
-  // Use 'postCreateCommand' to run setup commands ONCE after the container is created.
-  // This is more reliable than using the 'command' in docker-compose for one-time setup.
+  // This command is now simple: just install dependencies.
   "postCreateCommand": "npm install && cd ui && npm install && npm run build && cd ..",
-  // Customizations for VS Code within the Codespace.
   "customizations": {
     "vscode": {
       "extensions": [
@@ -22,10 +17,8 @@
       ]
     }
   },
-  // Ensure the app port is forwarded.
   "forwardPorts": [
     3000
   ],
-  // Specify the user for VS Code to connect as.
   "remoteUser": "node"
 }
