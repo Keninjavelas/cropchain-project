@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CropChain Dashboard</title>
+    <!-- Load React and ReactDOM from CDN -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <!-- Load Babel to transpile JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 antialiased">
+
+<div id="root"></div>
+
+<script type="text/babel">
+    const { useState, useEffect } = React;
+
+    // Use port 3000 to match our backend server
+    const API_BASE_URL = `http://${window.location.hostname}:3000/api`;
+
+    const App = () => {
+        const [view, setView] = useState('form');
+        const [products, setProducts] = useState([]);
+        const [selectedProduct, setSelectedProduct] = useState(null);
+        const [message, setMessage] = useState({ text: '', type: '' });
+        const [isLoading, setIsLoading] = useState(false);
+
+        const MessageBox = ({ message, type, onClose }) => {
+            if (!message) return null;
+            const bgColor = type === 'success' ? 'bg-green-500' : 'bg-red-500';
+            return (
+                <div className={`fixed bottom-4 right-4 p-4 rounded-lg shadow-xl text-white ${bgColor} transition-transform transform-gpu duration-300`}>
+                    <div className="flex justify-between items-center">
+                        <p>{message}</p>
+                        <button onClick={onClose} className="ml-4 font-bold">
+                            &times;
+                        </button>
+                    </div>
+                </div>
+            );
+        };
+
+        const showMessage = (text, type) => {
+            setMessage({ text, type });
+            setTimeout(() => setMessage({ text: '', type: '' }), 5000);
+        };
+
+        const fetchAllProducts = async () => {
+            setIsLoading(true);
+            try {
+                const response = await fetch(`${API_BASE_URL}/products/queryAll`);
+                const data = await response.json();
+                if (response.ok) {
+                    setProducts(data);
+                    showMessage('Products loaded successfully!', 'success');
+                } else {
+                    throw new Error(data.error || 'Failed to fetch products.');
+                }
+            } catch (error) {
+                console.error('Fetch error:', error);
+                showMessage(`Error fetching products: ${error.message}`, 'error');
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        const fetchProductDetails = async (id) => {
+            setIsLoading(true);
+            try {
+                const response = await fetch(`${API_BASE_URL}/products/${id}`);
+                const data = await response.json();
+                if (response.ok) {
+                    setSelectedProduct(data);
+                    setView('details');
+                } else {
+                    throw new Error(data.error || 'Failed to fetch product details.');
+                }
+            } catch (error) {
+                console.error('Fetch error:', error);
+                showMessage(`Error fetching product: ${error.message}`, 'error');
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        useEffect(() => {
+            if (view === 'list') {
+                fetchAllProducts();
+            }
+        }, [view]);
+
+        const ProductForm = () => {
+            const [formData, setFormData] = useState({
+                id: '',
+                origin: '',
+                product: '',
+                status: 'Harvested',
+                owner: ''
+            });
+
+            const handleChange = (e) => {
+                setFormData({ ...formData, [e.target.name]: e.target.value });
+            };
+
+            const handleSubmit = async (e) => {
+                e.preventDefault();
+                setIsLoading(true);
+                try {
+                    const response = await fetch(`${API_BASE_URL}/products/create`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(formData),
+                    });
+                    const data = await response.json();
+                    if (response.ok) {
+                        showMessage('Product created successfully!', 'success');
+                        setFormData({ id: '', origin: '', product: '', status: 'Harvested', owner: '' });
+                    } else {
+                        throw new Error(data.error || 'Failed to create product.');
+                    }
+                } catch (error) {
+                    console.error('Submission failed:', error);
+                    showMessage(`Error creating product: ${error.message}`, 'error');
+                } finally {
+                    setIsLoading(false);
+                }
+            };
+
+            return (
+                <div className="bg-white p-8 rounded-xl shadow-lg w-full max-w-2xl transform transition-transform duration-300 hover:scale-[1.01]">
+                    <h2 className="text-3xl font-bold mb-6 text-gray-800 text-center">Add New Product</h2>
+                    <form onSubmit={handleSubmit} className="space-y-6">
+                        <input
+                            className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 transition-all duration-200"
+                            name="id"
+                            value={formData.id}
+                            onChange={handleChange}
+                            placeholder="Product ID (e.g., prod123)"
+                            required
+                        />
+                        <input
+                            className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 transition-all duration-200"
+                            name="origin"
+                            value={formData.origin}
+                            onChange={handleChange}
+                            placeholder="Origin Farm"
+                            required
+                        />
+                        <input
+                            className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 transition-all duration-200"
+                            name="product"
+                            value={formData.product}
+                            onChange={handleChange}
+                            placeholder="Product Name (e.g., Organic Apples)"
+                            required
+                        />
+                        <input
+                            className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 transition-all duration-200"
+                            name="owner"
+                            value={formData.owner}
+                            onChange={handleChange}
+                            placeholder="Current Owner (e.g., FarmerOrg)"
+                            required
+                        />
+                        <div className="flex items-center">
+                            <label className="text-gray-600 mr-2">Status:</label>
+                            <select
+                                name="status"
+                                value={formData.status}
+                                onChange={handleChange}
+                                className="p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 transition-all duration-200"
+                            >
+                                <option value="Harvested">Harvested</option>
+                                <option value="In Transit">In Transit</option>
+                                <option value="At Warehouse">At Warehouse</option>
+                                <option value="In Store">In Store</option>
+                                <option value="Sold">Sold</option>
+                            </select>
+                        </div>
+                        <button
+                            type="submit"
+                            disabled={isLoading}
+                            className="w-full bg-green-600 text-white font-bold p-3 rounded-lg hover:bg-green-700 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-50 transform hover:scale-[1.02] disabled:bg-gray-400"
+                        >
+                            {isLoading ? 'Submitting...' : 'Add Product to Ledger'}
+                        </button>
+                    </form>
+                </div>
+            );
+        };
+
+        const ProductList = () => {
+            return (
+                <div className="bg-white p-8 rounded-xl shadow-lg w-full max-w-4xl transform transition-transform duration-300 hover:scale-[1.01]">
+                    <h2 className="text-3xl font-bold mb-6 text-gray-800 text-center">Product Traceability</h2>
+                    <div className="space-y-4">
+                        {products.length === 0 && !isLoading && (
+                            <p className="text-center text-gray-500">No products found. Add a new one to see it here!</p>
+                        )}
+                        {products.map((product) => (
+                            <div
+                                key={product.ID}
+                                onClick={() => fetchProductDetails(product.ID)}
+                                className="bg-gray-100 p-4 rounded-lg shadow-md cursor-pointer hover:bg-gray-200 transition-all duration-200 transform hover:scale-[1.01] flex justify-between items-center"
+                            >
+                                <div>
+                                    <h3 className="text-xl font-semibold text-gray-700">{product.product}</h3>
+                                    <p className="text-gray-500">ID: {product.ID}</p>
+                                </div>
+                                <span className={`px-3 py-1 rounded-full text-sm font-semibold text-white ${
+                                    product.status === 'In Store' ? 'bg-blue-500' :
+                                    product.status === 'Sold' ? 'bg-gray-500' :
+                                    'bg-yellow-500'
+                                }`}>
+                                    {product.status}
+                                </span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
+        };
+
+        const ProductDetails = () => {
+            const [newStatus, setNewStatus] = useState(selectedProduct.status);
+
+            const handleUpdate = async (e) => {
+                e.preventDefault();
+                setIsLoading(true);
+                try {
+                    const response = await fetch(`${API_BASE_URL}/products/updateStatus`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ id: selectedProduct.ID, newStatus }),
+                    });
+                    const data = await response.json();
+                    if (response.ok) {
+                        showMessage('Status updated successfully!', 'success');
+                        fetchProductDetails(selectedProduct.ID); // Refresh details
+                    } else {
+                        throw new Error(data.error || 'Failed to update status.');
+                    }
+                } catch (error) {
+                    console.error('Update failed:', error);
+                    showMessage(`Error updating status: ${error.message}`, 'error');
+                } finally {
+                    setIsLoading(false);
+                }
+            };
+
+            if (!selectedProduct) {
+                return <div className="text-center text-gray-500">Product details not found.</div>;
+            }
+
+            return (
+                <div className="bg-white p-8 rounded-xl shadow-lg w-full max-w-2xl transform transition-transform duration-300 hover:scale-[1.01]">
+                    <button
+                        onClick={() => setView('list')}
+                        className="mb-4 text-blue-500 font-semibold flex items-center"
+                    >
+                        &larr; Back to List
+                    </button>
+                    <h2 className="text-3xl font-bold mb-6 text-gray-800 text-center">{selectedProduct.product}</h2>
+                    <div className="space-y-4 text-lg">
+                        <p><strong>ID:</strong> <span className="font-mono">{selectedProduct.ID}</span></p>
+                        <p><strong>Origin:</strong> {selectedProduct.origin}</p>
+                        <p><strong>Current Owner:</strong> {selectedProduct.owner}</p>
+                        <p><strong>Current Status:</strong> {selectedProduct.status}</p>
+                        <p><strong>Last Updated:</strong> {new Date(selectedProduct.timestamp * 1000).toLocaleString()}</p>
+                    </div>
+                    <hr className="my-6" />
+                    <form onSubmit={handleUpdate} className="space-y-4">
+                        <h3 className="text-xl font-bold text-gray-700">Update Status</h3>
+                        <div className="flex flex-col md:flex-row items-center space-y-4 md:space-y-0 md:space-x-4">
+                            <select
+                                value={newStatus}
+                                onChange={(e) => setNewStatus(e.target.value)}
+                                className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 transition-all duration-200"
+                            >
+                                <option value="Harvested">Harvested</option>
+                                <option value="In Transit">In Transit</option>
+                                <option value="At Warehouse">At Warehouse</option>
+                                <option value="In Store">In Store</option>
+                                <option value="Sold">Sold</option>
+                            </select>
+                            <button
+                                type="submit"
+                                disabled={isLoading}
+                                className="w-full md:w-auto bg-green-600 text-white font-bold p-3 rounded-lg hover:bg-green-700 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-50 transform hover:scale-[1.02] disabled:bg-gray-400"
+                            >
+                                {isLoading ? 'Updating...' : 'Update'}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            );
+        };
+
+        const renderView = () => {
+            switch (view) {
+                case 'form':
+                    return <ProductForm />;
+                case 'list':
+                    return <ProductList />;
+                case 'details':
+                    return <ProductDetails />;
+                default:
+                    return <ProductForm />;
+            }
+        };
+
+        return (
+            <div className="min-h-screen p-8 flex flex-col items-center font-sans text-gray-800">
+                <header className="w-full max-w-4xl mb-8">
+                    <nav className="flex justify-center space-x-4 bg-white p-4 rounded-lg shadow-md">
+                        <button
+                            onClick={() => setView('form')}
+                            className={`font-semibold px-4 py-2 rounded-lg transition-colors duration-200 ${view === 'form' ? 'bg-green-500 text-white' : 'text-gray-600 hover:bg-gray-200'}`}
+                        >
+                            Add Product
+                        </button>
+                        <button
+                            onClick={() => setView('list')}
+                            className={`font-semibold px-4 py-2 rounded-lg transition-colors duration-200 ${view === 'list' ? 'bg-green-500 text-white' : 'text-gray-600 hover:bg-gray-200'}`}
+                        >
+                            View All Products
+                        </button>
+                    </nav>
+                </header>
+                <main className="flex-grow w-full flex justify-center">
+                    {renderView()}
+                </main>
+                {isLoading && (
+                    <div className="fixed top-0 left-0 w-full h-full bg-gray-800 bg-opacity-50 flex items-center justify-center z-50">
+                        <div className="text-white text-xl font-bold">Loading...</div>
+                    </div>
+                )}
+                <MessageBox message={message.text} type={message.type} onClose={() => setMessage({ text: '', type: '' })} />
+            </div>
+        );
+    };
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+
+</script>
+</body>
+</html>
