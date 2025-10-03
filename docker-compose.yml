@@ -21,16 +21,17 @@ services:
     working_dir: /workspace
     ports:
       - "3000:3000"
+    # The depends_on is still here, so the containers will start,
+    # but the setup script is not run automatically.
     depends_on:
       - mysql
       - ipfs
       - orderer.example.com
       - peer0.org1.example.com
-    # This command is now simple: just start the application.
-    # The complex setup is handled by devcontainer.json's postCreateCommand.
+    # The command is now simple and will not fail.
     command: npm start
 
-  # All other services remain the same to run the full stack
+  # All other services remain the same
   mysql:
     image: mysql:8.0
     container_name: cropchain_mysql
