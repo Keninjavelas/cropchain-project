@@ -1,7 +1,6 @@
 version: '3.7'
 
 services:
-  # Main Application Service
   app:
     build:
       context: .
@@ -27,15 +26,11 @@ services:
       - ipfs
       - orderer.example.com
       - peer0.org1.example.com
-    command: >
-      bash -c "
-        # This script will run inside the container to set up the network
-        /workspace/scripts/setup-fabric.sh &&
-        # After setup, it starts the application
-        npm start
-      "
+    # This command is now simple: just start the application.
+    # The complex setup is handled by devcontainer.json's postCreateCommand.
+    command: npm start
 
-  # MySQL Database Service
+  # All other services remain the same to run the full stack
   mysql:
     image: mysql:8.0
     container_name: cropchain_mysql
@@ -51,7 +46,6 @@ services:
       - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql
       - mysql_data:/var/lib/mysql
 
-  # IPFS Service
   ipfs:
     image: ipfs/go-ipfs:latest
     container_name: cropchain_ipfs
@@ -62,7 +56,6 @@ services:
     volumes:
       - ipfs_data:/data/ipfs
 
-  # --- FABRIC NETWORK SERVICES ---
   ca.org1.example.com:
     extends:
       file: fabric-network/docker-compose-fabric.yaml
