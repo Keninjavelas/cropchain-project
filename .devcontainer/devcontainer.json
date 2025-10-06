@@ -1,24 +1,17 @@
 {
   "name": "CropChain Stable Environment",
-  // This builds a single, simple container from the Dockerfile.
-  "build": {
-    "dockerfile": "../Dockerfile"
-  },
-  // This feature adds the Docker tools (docker, docker-compose) to our environment.
+  // Use a standard, pre-built image from Microsoft that is guaranteed to work.
+  // This image includes Node.js, Docker, and Docker Compose correctly configured.
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:18-bullseye",
+
+  // This feature enables Docker-in-Docker the correct and stable way.
   "features": {
     "ghcr.io/devcontainers/features/docker-in-docker:2": {}
   },
-  // Basic VS Code extensions
-  "customizations": {
-    "vscode": {
-      "extensions": [
-        "dbaeumer.vscode-eslint",
-        "esbenp.prettier-vscode",
-        "golang.go",
-        "ms-azuretools.vscode-docker"
-      ]
-    }
-  },
-  // We are NOT running any commands on startup. We will do it manually.
-  "remoteUser": "node"
+
+  // This ensures commands are run as a non-root user but with Docker access.
+  "remoteUser": "node",
+
+  // This keeps the container running so we can attach to it.
+  "overrideCommand": false
 }
