@@ -58,6 +58,12 @@ Application: &ApplicationDefaults
 
 Orderer: &OrdererDefaults
   OrdererType: etcdraft
+  # This EtcdRaft block is the critical fix.
+  EtcdRaft:
+    Consenters:
+      - Host: orderer.example.com
+        Port: 7050
+        # NOTE: TLS certs are omitted because we run with TLS disabled for simplicity.
   Addresses:
     - orderer.example.com:7050
   BatchTimeout: 2s
@@ -116,3 +122,4 @@ Profiles:
         - *Org1
       Capabilities:
         <<: *ApplicationCapabilities
+
