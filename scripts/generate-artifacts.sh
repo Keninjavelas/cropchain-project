@@ -7,7 +7,7 @@ cd "$(dirname "$0")/.."
 
 # STEP 1: Fix all file permissions to prevent any "Permission denied" errors.
 echo "-----> Taking ownership of all project files..."
-sudo chown -R $(whoami) .
+#sudo chown -R $(whoami) .
 
 # Set environment variable for the config files
 export FABRIC_CFG_PATH=${PWD}/fabric-network
