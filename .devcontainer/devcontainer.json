@@ -1,7 +1,8 @@
 {
-  "name": "CropChain Stable Environment",
-  // Use a standard, pre-built image from Microsoft that is guaranteed to work.
-  // This image includes Node.js, Docker, and Docker Compose correctly configured.
+  "name": "CropChain Final Stable Environment",
+
+  // This is the key. We use a standard, pre-built image that is known to be correct.
+  // It includes Node.js, Docker, and Docker Compose, all correctly configured.
   "image": "mcr.microsoft.com/devcontainers/javascript-node:18-bullseye",
 
   // This feature enables Docker-in-Docker the correct and stable way.
@@ -9,9 +10,6 @@
     "ghcr.io/devcontainers/features/docker-in-docker:2": {}
   },
 
-  // This ensures commands are run as a non-root user but with Docker access.
-  "remoteUser": "node",
-
-  // This keeps the container running so we can attach to it.
+  // This keeps the container running so we can work inside it.
   "overrideCommand": false
 }
