@@ -1,241 +1,188 @@
 'use strict';
 
+// Standard library imports
 const express = require('express');
-const cors = require('cors');
 const path = require('path');
-const crypto = require('crypto');
-const axios = require('axios');
-const mysql = require('mysql2/promise');
-const { create } = require('ipfs-http-client');
-const fileUpload = require('express-fileupload');
-const qr = require('qrcode');
-
-const { Gateway, Wallets } = require('fabric-network');
-const FabricCAServices = require('fabric-ca-client');
+const cors = require('cors');
 const fs = require('fs');
 const yaml = require('js-yaml');
 
-// --- Configuration ---
-const PORT = process.env.PORT || 3000;
-const HOST = '0.0.0.0';
-const app = express();
+// Fabric-specific imports
+const { Gateway, Wallets } = require('fabric-network');
+const FabricCAServices = require('fabric-ca-client');
 
+// --- Main Application Setup ---
+const app = express();
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(fileUpload());
-app.use(express.static(path.join(__dirname, 'ui/dist'))); // Serve React App
 
+// Serve the static UI from the 'public' directory
+app.use(express.static(path.join(__dirname, 'public')));
 
-// --- Connections ---
-let db, ipfs;
-let fabricContract = null; // Start with no contract connection
+// --- Global Variables ---
+let fabricContract;
+let ipfsClient;
 
-// Database Connection Pool
-const dbPool = mysql.createPool({
-    host: process.env.DB_HOST || 'mysql',
-    user: process.env.DB_USER || 'user',
-    password: process.env.DB_PASSWORD || 'password',
-    database: process.env.DB_NAME || 'cropchain',
-    waitForConnections: true,
-    connectionLimit: 10,
-    queueLimit: 0
-});
+// --- API Endpoints ---
 
-// IPFS Client
-const ipfsClient = create({
-    host: process.env.IPFS_HOST || 'ipfs',
-    port: process.env.IPFS_PORT || 5001,
-    protocol: 'http'
-});
-
-
-// --- Hyperledger Fabric Helper Functions ---
-
-// This function will now be called on-demand via an API endpoint
-async function initializeFabric() {
-    if (fabricContract) {
-        console.log('Fabric connection already initialized.');
-        return fabricContract;
-    }
-
-    console.log('Attempting to initialize Hyperledger Fabric connection...');
-    try {
-        const ccpPath = path.resolve(__dirname, 'fabric-network', 'connection-org1.yaml');
-        const ccpFile = fs.readFileSync(ccpPath, 'utf8');
-        const ccp = yaml.load(ccpFile);
-
-        const walletPath = path.join(process.cwd(), 'wallet');
-        const wallet = await Wallets.newFileSystemWallet(walletPath);
-
-        const gateway = new Gateway();
-        await gateway.connect(ccp, { wallet, identity: 'appUser', discovery: { enabled: true, asLocalhost: true } });
-        const network = await gateway.getNetwork('cropchainchannel');
-        const contract = network.getContract('cropchain');
-        
-        console.log('Fabric connection initialized successfully.');
-        fabricContract = contract; // Store the contract for later use
-        return contract;
-
-    } catch (error) {
-        console.error(`Failed to initialize Fabric connection: ${error}`);
-        throw error; // Propagate the error to be handled by the API caller
-    }
-}
-
-
-// --- API Routes ---
-
-// New endpoint to manually trigger the blockchain connection
+// Endpoint to manually initialize the blockchain connection
 app.post('/api/connect-blockchain', async (req, res) => {
     try {
+        if (fabricContract) {
+            return res.json({ success: true, message: 'Already connected to the blockchain.' });
+        }
         await initializeFabric();
         res.json({ success: true, message: 'Successfully connected to the blockchain network.' });
     } catch (error) {
-        res.status(500).json({ success: false, message: `Failed to connect to blockchain: ${error.message}` });
+        console.error(`Failed to connect to blockchain: ${error}`);
+        res.status(500).json({ success: false, error: `Failed to connect to blockchain: ${error.message}` });
     }
 });
 
 
-// Middleware to check if the blockchain is connected before proceeding
-const requireBlockchain = (req, res, next) => {
-    if (!fabricContract) {
-        return res.status(503).json({
-            success: false,
-            message: 'Blockchain network is not initialized. Please connect first.'
-        });
-    }
-    next();
-};
-
-
-// Upload file to IPFS (does not require blockchain)
-app.post('/api/upload', async (req, res) => {
-    if (!req.files || Object.keys(req.files).length === 0) {
-        return res.status(400).send('No files were uploaded.');
-    }
-    const file = req.files.document;
+// Create a new product
+app.post('/api/products/create', async (req, res) => {
+    if (!fabricContract) return res.status(503).json({ error: 'Blockchain network is not initialized.' });
+    const { id, origin, product, status, owner } = req.body;
     try {
-        const added = await ipfs.add(file.data);
-        res.json({ success: true, ipfsHash: added.path, fileName: file.name });
-    } catch (error) {
-        console.error('IPFS upload error:', error);
-        res.status(500).json({ success: false, message: 'Failed to upload file to IPFS.' });
-    }
-});
-
-
-// Create a new product (requires blockchain)
-app.post('/api/products', requireBlockchain, async (req, res) => {
-    const { id, type, farmerName, description, ipfsHash, fileName } = req.body;
-    if (!id || !type || !farmerName) {
-        return res.status(400).json({ success: false, message: 'Missing required fields.' });
-    }
-
-    try {
-        const marketResponse = await axios.get(process.env.MARKET_API_URL || 'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd');
-        const marketDataString = JSON.stringify(marketResponse.data);
-        const marketPriceHash = crypto.createHash('sha256').update(marketDataString).digest('hex');
-
-        await fabricContract.submitTransaction('CreateProduct', id, type, farmerName, marketPriceHash, ipfsHash || '');
-        
-        await db.execute(
-            'INSERT INTO products (id, type, farmer_name, description) VALUES (?, ?, ?, ?)',
-            [id, type, farmerName, description || '']
-        );
-        if (ipfsHash && fileName) {
-            await db.execute(
-                'INSERT INTO documents (product_id, ipfs_hash, file_name) VALUES (?, ?, ?)',
-                [id, ipfsHash, fileName]
-            );
-        }
-
+        await fabricContract.submitTransaction('CreateProduct', id, product, origin, owner, status);
         res.status(201).json({ success: true, message: `Product ${id} created successfully.` });
-
     } catch (error) {
         console.error(`Failed to create product: ${error}`);
-        res.status(500).json({ success: false, message: `Failed to create product: ${error.message}` });
+        res.status(500).json({ success: false, error: error.toString() });
     }
 });
 
-// Ship a product (requires blockchain)
-app.post('/api/products/:id/ship', requireBlockchain, async (req, res) => {
-    const { id } = req.params;
-    const { newOwner } = req.body;
-    if (!newOwner) {
-        return res.status(400).json({ success: false, message: 'New owner is required.' });
-    }
+// Query all products
+app.get('/api/products/queryAll', async (req, res) => {
+    if (!fabricContract) return res.status(503).json({ error: 'Blockchain network is not initialized.' });
     try {
-        await fabricContract.submitTransaction('ShipProduct', id, newOwner);
-        res.json({ success: true, message: `Product ${id} shipped to ${newOwner}.` });
+        const result = await fabricContract.evaluateTransaction('QueryAllProducts');
+        const products = JSON.parse(result.toString());
+        res.json(products);
     } catch (error) {
-        console.error(`Failed to ship product: ${error}`);
-        res.status(500).json({ success: false, message: `Failed to ship product: ${error.message}` });
+        console.error(`Failed to query all products: ${error}`);
+        res.status(500).json({ success: false, error: error.toString() });
     }
 });
 
-// Receive a product (requires blockchain)
-app.post('/api/products/:id/receive', requireBlockchain, async (req, res) => {
-    const { id } = req.params;
-    const { newOwner } = req.body;
-    if (!newOwner) {
-        return res.status(400).json({ success: false, message: 'New owner is required.' });
-    }
+// Query a single product by ID
+app.get('/api/products/:id', async (req, res) => {
+    if (!fabricContract) return res.status(503).json({ error: 'Blockchain network is not initialized.' });
     try {
-        await fabricContract.submitTransaction('ReceiveProduct', id, newOwner);
-        res.json({ success: true, message: `Product ${id} received by ${newOwner}.` });
+        const result = await fabricContract.evaluateTransaction('QueryProduct', req.params.id);
+        const product = JSON.parse(result.toString());
+        res.json(product);
     } catch (error) {
-        console.error(`Failed to receive product: ${error}`);
-        res.status(500).json({ success: false, message: `Failed to receive product: ${error.message}` });
+        console.error(`Failed to query product ${req.params.id}: ${error}`);
+        res.status(500).json({ success: false, error: error.toString() });
     }
 });
 
-// Get product history from the ledger (requires blockchain)
-app.get('/api/products/:id/history', requireBlockchain, async (req, res) => {
-    const { id } = req.params;
+// Update a product's status
+app.post('/api/products/updateStatus', async (req, res) => {
+    if (!fabricContract) return res.status(503).json({ error: 'Blockchain network is not initialized.' });
+    const { id, newStatus } = req.body;
     try {
-        const result = await fabricContract.evaluateTransaction('GetProductHistory', id);
-        res.json({ success: true, history: JSON.parse(result.toString()) });
+        await fabricContract.submitTransaction('UpdateProductStatus', id, newStatus);
+        res.json({ success: true, message: `Product ${id} status updated to ${newStatus}.` });
     } catch (error) {
-        console.error(`Failed to get product history: ${error}`);
-        res.status(500).json({ success: false, message: `Failed to get product history: ${error.message}` });
+        console.error(`Failed to update product status: ${error}`);
+        res.status(500).json({ success: false, error: error.toString() });
     }
 });
 
 
-// Generate QR Code for product history (does not require blockchain)
-app.get('/api/products/:id/qrcode', async (req, res) => {
-    const { id } = req.params;
-    const url = `${req.protocol}://${req.get('host')}/history/${id}`; 
-    try {
-        const qrCodeImage = await qr.toDataURL(url);
-        res.send(`<img src="${qrCodeImage}"/>`);
-    } catch (err) {
-        console.error('Failed to generate QR code:', err);
-        res.status(500).send('Could not generate QR code.');
+// --- Helper Functions ---
+
+async function initializeFabric() {
+    console.log('Attempting to initialize Fabric connection...');
+    const ccpPath = path.resolve(__dirname, 'fabric-network', 'connection-org1.yaml');
+    if (!fs.existsSync(ccpPath)) {
+        throw new Error(`Connection profile not found at ${ccpPath}. Please ensure it is generated or placed correctly.`);
     }
-});
+    const ccp = yaml.load(fs.readFileSync(ccpPath, 'utf8'));
 
+    const walletPath = path.join(__dirname, 'wallet');
+    const wallet = await Wallets.newFileSystemWallet(walletPath);
 
-// --- Server Initialization ---
-async function startServer() {
+    const identity = await wallet.get('appUser');
+    if (!identity) {
+        console.log('An identity for the user "appUser" does not exist in the wallet. Enrolling now...');
+        await enrollAppUser(ccp, wallet);
+    }
+
+    const gateway = new Gateway();
     try {
-        // Connect to off-chain services on startup
-        db = await dbPool;
-        ipfs = ipfsClient;
-
-        app.listen(PORT, HOST, () => {
-            console.log(`Server running on http://${HOST}:${PORT}`);
-            console.log('Application is running in a stable, lightweight mode.');
-            console.log('Blockchain features are currently disabled.');
-            console.log('Run "curl -X POST http://localhost:3000/api/connect-blockchain" to enable them after setting up the network.');
-        });
-
+        await gateway.connect(ccp, { wallet, identity: 'appUser', discovery: { enabled: true, asLocalhost: true } });
+        const network = await gateway.getNetwork('cropchainchannel');
+        fabricContract = network.getContract('cropchain');
+        console.log('Fabric connection initialized successfully.');
     } catch (error) {
-        console.error("Failed to start server:", error);
-        process.exit(1);
+        console.error(`Failed to connect to gateway: ${error}`);
+        gateway.disconnect();
+        throw error;
     }
 }
 
-startServer();
+async function enrollAppUser(ccp, wallet) {
+    try {
+        const caInfo = ccp.certificateAuthorities['ca.org1.example.com'];
+        const ca = new FabricCAServices(caInfo.url, { trustedRoots: caInfo.tlsCACerts.pem, verify: false }, caInfo.caName);
+
+        const adminIdentity = await wallet.get('admin');
+        if (!adminIdentity) {
+            console.log('Enrolling admin user...');
+            const enrollment = await ca.enroll({ enrollmentID: 'admin', enrollmentSecret: 'adminpw' });
+            const x509Identity = {
+                credentials: { certificate: enrollment.certificate, privateKey: enrollment.key.toBytes() },
+                mspId: 'Org1MSP',
+                type: 'X.509',
+            };
+            await wallet.put('admin', x509Identity);
+            console.log('Successfully enrolled admin user.');
+        }
+
+        const adminGateway = new Gateway();
+        await adminGateway.connect(ccp, { wallet, identity: 'admin', discovery: { enabled: true, asLocalhost: true } });
+        const adminService = adminGateway.getClient().getCertificateAuthority();
+        const provider = wallet.getProviderRegistry().getProvider(adminIdentity.type);
+        const adminUser = await provider.getUserContext(adminIdentity, 'admin');
+
+        const secret = await adminService.register({ affiliation: 'org1.department1', enrollmentID: 'appUser', role: 'client' }, adminUser);
+        const enrollment = await ca.enroll({ enrollmentID: 'appUser', enrollmentSecret: secret });
+        const x509Identity = {
+            credentials: { certificate: enrollment.certificate, privateKey: enrollment.key.toBytes() },
+            mspId: 'Org1MSP',
+            type: 'X.509',
+        };
+        await wallet.put('appUser', x509Identity);
+        console.log('Successfully registered and enrolled "appUser".');
+        adminGateway.disconnect();
+
+    } catch (error) {
+        console.error(`Failed to enroll app user: ${error}`);
+        throw error;
+    }
+}
+
+
+// --- Server Initialization ---
+
+const PORT = 3000;
+app.listen(PORT, async () => {
+    console.log(`Server is running on port ${PORT}`);
+    console.log('Application is running in a stable, lightweight mode.');
+    console.log('Blockchain features are currently disabled.');
+    
+    // This is the critical fix for the IPFS client import
+    try {
+        const { create } = await import('ipfs-http-client');
+        ipfsClient = create({ host: 'ipfs', port: 5001, protocol: 'http' });
+        console.log('IPFS client connected.');
+    } catch (error) {
+        console.error('Could not connect to IPFS client:', error);
+    }
+});
 
