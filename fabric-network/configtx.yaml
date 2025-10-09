@@ -53,11 +53,14 @@ Application: &ApplicationDefaults
     Admins:
       Type: ImplicitMeta
       Rule: "MAJORITY Admins"
+    # THIS IS THE CRITICAL FIX - THE MISSING ENDORSEMENT POLICY
+    Endorsement:
+      Type: ImplicitMeta
+      Rule: "MAJORITY Endorsement"
   Capabilities:
     <<: *ApplicationCapabilities
 
 Orderer: &OrdererDefaults
-  # This is the critical fix. We switch from 'etcdraft' to 'solo'.
   OrdererType: solo
   Addresses:
     - orderer.example.com:7050
@@ -117,4 +120,5 @@ Profiles:
         - *Org1
       Capabilities:
         <<: *ApplicationCapabilities
+
 
