@@ -40,7 +40,6 @@ app.post('/api/connect-blockchain', async (req, res) => {
     }
 });
 
-
 // Create a new product
 app.post('/api/products/create', async (req, res) => {
     if (!fabricContract) return res.status(503).json({ error: 'Blockchain network is not initialized.' });
@@ -115,7 +114,7 @@ async function initializeFabric() {
 
     const gateway = new Gateway();
     try {
-        await gateway.connect(ccp, { wallet, identity: 'appUser', discovery: { enabled: true, asLocalhost: true } });
+        await gateway.connect(ccp, { wallet, identity: 'appUser', discovery: { enabled: true, asLocalhost: false } });
         const network = await gateway.getNetwork('cropchainchannel');
         fabricContract = network.getContract('cropchain');
         console.log('Fabric connection initialized successfully.');
@@ -129,7 +128,10 @@ async function initializeFabric() {
 async function enrollAppUser(ccp, wallet) {
     try {
         const caInfo = ccp.certificateAuthorities['ca.org1.example.com'];
-        const ca = new FabricCAServices(caInfo.url, { trustedRoots: caInfo.tlsCACerts.pem, verify: false }, caInfo.caName);
+        
+        // --- THIS IS THE CRITICAL FIX ---
+        // For a non-TLS connection, we do not need to provide TLS certificate options.
+        const ca = new FabricCAServices(caInfo.url, undefined, caInfo.caName);
 
         const adminIdentity = await wallet.get('admin');
         if (!adminIdentity) {
@@ -138,14 +140,14 @@ async function enrollAppUser(ccp, wallet) {
             const x509Identity = {
                 credentials: { certificate: enrollment.certificate, privateKey: enrollment.key.toBytes() },
                 mspId: 'Org1MSP',
-                type: 'X.509',
+                type: 'X.09',
             };
             await wallet.put('admin', x509Identity);
             console.log('Successfully enrolled admin user.');
         }
 
         const adminGateway = new Gateway();
-        await adminGateway.connect(ccp, { wallet, identity: 'admin', discovery: { enabled: true, asLocalhost: true } });
+        await adminGateway.connect(ccp, { wallet, identity: 'admin', discovery: { enabled: true, asLocalhost: false } });
         const adminService = adminGateway.getClient().getCertificateAuthority();
         const provider = wallet.getProviderRegistry().getProvider(adminIdentity.type);
         const adminUser = await provider.getUserContext(adminIdentity, 'admin');
@@ -155,7 +157,7 @@ async function enrollAppUser(ccp, wallet) {
         const x509Identity = {
             credentials: { certificate: enrollment.certificate, privateKey: enrollment.key.toBytes() },
             mspId: 'Org1MSP',
-            type: 'X.509',
+            type: 'X.09',
         };
         await wallet.put('appUser', x509Identity);
         console.log('Successfully registered and enrolled "appUser".');
@@ -176,7 +178,6 @@ app.listen(PORT, async () => {
     console.log('Application is running in a stable, lightweight mode.');
     console.log('Blockchain features are currently disabled.');
     
-    // This is the critical fix for the IPFS client import
     try {
         const { create } = await import('ipfs-http-client');
         ipfsClient = create({ host: 'ipfs', port: 5001, protocol: 'http' });
@@ -185,4 +186,3 @@ app.listen(PORT, async () => {
         console.error('Could not connect to IPFS client:', error);
     }
 });
-
