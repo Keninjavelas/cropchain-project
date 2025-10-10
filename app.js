@@ -128,7 +128,12 @@ async function initializeFabric() {
 async function enrollAppUser(ccp, wallet) {
     try {
         const caInfo = ccp.certificateAuthorities['ca.org1.example.com'];
-        const ca = new FabricCAServices(caInfo.url, undefined, caInfo.caName);
+
+        // --- THIS IS THE CRITICAL FIX ---
+        // We must provide the CA's root certificate to the client so it can establish a trusted connection.
+        const caCert = fs.readFileSync(caInfo.tlsCACerts.path, 'utf8');
+        const tlsOptions = { trustedRoots: [caCert], verify: false };
+        const ca = new FabricCAServices(caInfo.url, tlsOptions, caInfo.caName);
 
         // First, enroll the admin if it doesn't exist.
         const adminIdentity = await wallet.get('admin');
@@ -138,7 +143,7 @@ async function enrollAppUser(ccp, wallet) {
             const x509Identity = {
                 credentials: { certificate: enrollment.certificate, privateKey: enrollment.key.toBytes() },
                 mspId: 'Org1MSP',
-                type: 'X.509', // Corrected from X.09
+                type: 'X.509',
             };
             await wallet.put('admin', x509Identity);
             console.log('Successfully enrolled admin user.');
@@ -158,7 +163,7 @@ async function enrollAppUser(ccp, wallet) {
         const x509Identity = {
             credentials: { certificate: enrollment.certificate, privateKey: enrollment.key.toBytes() },
             mspId: 'Org1MSP',
-            type: 'X.509', // Corrected from X.09
+            type: 'X.509',
         };
         await wallet.put('appUser', x509Identity);
         console.log('Successfully registered and enrolled "appUser".');
