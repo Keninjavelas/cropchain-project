@@ -130,10 +130,8 @@ async function enrollAppUser(ccp, wallet) {
         const caInfo = ccp.certificateAuthorities['ca.org1.example.com'];
 
         // --- THIS IS THE CRITICAL FIX ---
-        // We must provide the CA's root certificate to the client so it can establish a trusted connection for registration.
-        // We construct the path manually as it's predictable from the cryptogen tool.
-        const caCertPath = path.resolve(__dirname, 'fabric-network', 'crypto-config', 'peerOrganizations', 'org1.example.com', 'ca', 'ca.crt');
-        const caCert = fs.readFileSync(caCertPath, 'utf8');
+        // Instead of hardcoding a wrong filename, we now correctly use the path from the connection profile.
+        const caCert = fs.readFileSync(caInfo.tlsCACerts.path, 'utf8');
         const tlsOptions = { trustedRoots: [caCert], verify: false };
         const ca = new FabricCAServices(caInfo.url, tlsOptions, caInfo.caName);
 
@@ -170,7 +168,7 @@ async function enrollAppUser(ccp, wallet) {
         await wallet.put('appUser', x509Identity);
         console.log('Successfully registered and enrolled "appUser".');
 
-    } catch (error) { // This is the line that was fixed
+    } catch (error) {
         console.error(`Failed to enroll app user: ${error}`);
         throw error;
     }
@@ -193,4 +191,3 @@ app.listen(PORT, async () => {
         console.error('Could not connect to IPFS client:', error);
     }
 });
-
