@@ -67,7 +67,6 @@ services:
     volumes:
       - ./fabric-network/crypto-config/peerOrganizations/org1.example.com/ca/:/etc/hyperledger/fabric-ca-server
 
-  # THIS IS THE CRITICAL "CONTROL ROOM" CONTAINER
   cli:
     container_name: cli
     image: hyperledger/fabric-tools:2.2.0
@@ -99,6 +98,8 @@ services:
       - "3000:3000"
     volumes:
       - .:/workspace
+    # THIS IS THE CRITICAL FIX: Give the container a direct order to start the server.
+    command: npm start
     depends_on:
       - peer0.org1.example.com
       - orderer.example.com
@@ -127,3 +128,4 @@ services:
       - "8080:8080"
     volumes:
       - ipfs_data:/data/ipfs
+
