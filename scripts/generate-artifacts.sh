@@ -42,7 +42,7 @@ if [ $? -ne 0 ]; then
 fi
 
 # --- THIS IS THE CRITICAL FIX ---
-echo "-----> Generating connection profile for a NON-TLS network..."
+echo "-----> Generating connection profile with correct filenames..."
 # Define the template for our connection profile
 cat <<EOF > fabric-network/connection-org1.yaml
 ---
@@ -63,17 +63,17 @@ organizations:
       - ca.org1.example.com
 peers:
   peer0.org1.example.com:
-    # Use the service name for the Docker network
     url: grpc://peer0.org1.example.com:7051
-    # NO TLS certs are needed for an insecure connection
+    # TLS is disabled, so no tlsCACerts needed here for the peer
 certificateAuthorities:
   ca.org1.example.com:
-    # Use the service name for the Docker network
     url: http://ca.org1.example.com:7054
     caName: ca.org1.example.com
+    tlsCACerts:
+      # This is the corrected filename
+      path: ${PWD}/fabric-network/crypto-config/peerOrganizations/org1.example.com/ca/ca.org1.example.com-cert.pem
     httpOptions:
       verify: false
 EOF
 
 echo "========= Artifact Generation Complete - SUCCESS! ========="
-
