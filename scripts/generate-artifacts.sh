@@ -1,6 +1,6 @@
 #!/bin/bash
 
-echo "========= Generating Crypto Material and Genesis Block (Final, Clean Version) ========="
+echo "========= Generating Crypto Material and Genesis Block (Final, Corrected Version) ========="
 
 # Make sure we are in the project root for consistent paths
 cd "$(dirname "$0")/.."
@@ -41,8 +41,9 @@ if [ $? -ne 0 ]; then
   exit 1
 fi
 
-# STEP 5: Generate the connection profile for the application
-echo "-----> Generating connection profile..."
+# --- THIS IS THE CRITICAL FIX ---
+echo "-----> Generating connection profile for a NON-TLS network..."
+# Define the template for our connection profile
 cat <<EOF > fabric-network/connection-org1.yaml
 ---
 name: cropchain-network-org1
@@ -62,19 +63,17 @@ organizations:
       - ca.org1.example.com
 peers:
   peer0.org1.example.com:
-    url: grpc://localhost:7051
-    tlsCACerts:
-      path: ${PWD}/fabric-network/crypto-config/peerOrganizations/org1.example.com/peers/peer0.org1.example.com/tls/ca.crt
-    grpcOptions:
-      ssl-target-name-override: peer0.org1.example.com
+    # Use the service name for the Docker network
+    url: grpc://peer0.org1.example.com:7051
+    # NO TLS certs are needed for an insecure connection
 certificateAuthorities:
   ca.org1.example.com:
-    url: http://localhost:7054
+    # Use the service name for the Docker network
+    url: http://ca.org1.example.com:7054
     caName: ca.org1.example.com
-    tlsCACerts:
-      path: ${PWD}/fabric-network/crypto-config/peerOrganizations/org1.example.com/ca/ca.crt
     httpOptions:
       verify: false
 EOF
 
 echo "========= Artifact Generation Complete - SUCCESS! ========="
+
