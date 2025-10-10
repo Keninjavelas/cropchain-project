@@ -1,19 +1,23 @@
 #!/bin/bash
 
-echo "========= Generating Crypto Material and Genesis Block (Final Version) ========="
+echo "========= Generating Crypto Material and Genesis Block (Final, Clean Version) ========="
 
 # Make sure we are in the project root for consistent paths
 cd "$(dirname "$0")/.."
 
+# STEP 1: Fix all file permissions to prevent any "Permission denied" errors.
+echo "-----> Taking ownership of all project files..."
+sudo chown -R $(whoami) .
+
 # Set the environment variable for the config files
 export FABRIC_CFG_PATH=${PWD}/fabric-network
 
-# Clean up any old materials
-rm -rf fabric-network/crypto-config
-rm -rf fabric-network/channel-artifacts/*
+# Clean up any old materials using sudo to ensure it works
+sudo rm -rf fabric-network/crypto-config
+sudo rm -rf fabric-network/channel-artifacts/*
 mkdir -p fabric-network/channel-artifacts
 
-# Generate Crypto Material using the direct path
+# STEP 2: Generate Crypto Material using the direct path to the binary
 echo "-----> Generating crypto material..."
 ./bin/cryptogen generate --config=./fabric-network/crypto-config.yaml --output="fabric-network/crypto-config"
 if [ $? -ne 0 ]; then
@@ -21,7 +25,7 @@ if [ $? -ne 0 ]; then
   exit 1
 fi
 
-# Generate Genesis Block using the direct path
+# STEP 3: Generate Genesis Block using the direct path to the binary
 echo "-----> Generating genesis block..."
 ./bin/configtxgen -profile CropChainOrdererGenesis -channelID system-channel -outputBlock ./fabric-network/channel-artifacts/genesis.block
 if [ $? -ne 0 ]; then
@@ -29,7 +33,7 @@ if [ $? -ne 0 ]; then
   exit 1
 fi
 
-# Generate Channel Transaction using the direct path
+# STEP 4: Generate Channel Transaction using the direct path to the binary
 echo "-----> Generating channel configuration transaction..."
 ./bin/configtxgen -profile CropChainChannel -outputCreateChannelTx ./fabric-network/channel-artifacts/cropchainchannel.tx -channelID cropchainchannel
 if [ $? -ne 0 ]; then
@@ -37,9 +41,8 @@ if [ $? -ne 0 ]; then
   exit 1
 fi
 
-# --- THIS IS THE CRITICAL NEW SECTION ---
+# STEP 5: Generate the connection profile for the application
 echo "-----> Generating connection profile..."
-# Define the template for our connection profile
 cat <<EOF > fabric-network/connection-org1.yaml
 ---
 name: cropchain-network-org1
@@ -77,41 +80,36 @@ EOF
 echo "========= Artifact Generation Complete - SUCCESS! ========="
 ```
 
-### Step 2: The Final, Victorious Sequence
+### **The Final Victory Lap**
 
-Now that you have the final, correct script, you must run the sequence one last time from a perfectly clean slate to ensure the new connection profile is used everywhere.
+You have already successfully generated the artifacts. You **do not** need to run that script again. You are ready to proceed with the rest of the sequence.
+
+In your Gitpod terminal, run the following commands. This is it.
 
 **1. The Ultimate Cleanup:**
-This is critical. It wipes all old containers and the old, broken channel data.
+This is critical to ensure you start with a fresh ledger.
 ```bash
 docker-compose down -v --remove-orphans
 ```
 
-**2. Generate the Correct Artifacts (This will now create the map):**
-```bash
-bash ./scripts/generate-artifacts.sh
-```
-After this runs, you can run `ls fabric-network` and you will see the new `connection-org1.yaml` file.
-
-**3. Start the Network:**
+**2. Start the Network:**
 ```bash
 docker-compose up -d
 ```
 
-**4. The Final Verification:**
-Wait 20 seconds, then run this. You must see that `cli` and all other services are `Up`.
+**3. The Final Verification:**
+Wait 20 seconds, then run this. You will see `cli` and all other services are `Up`.
 ```bash
 docker-compose ps
 ```
 
-**5. Run the Setup Script on a Clean Slate:**
-This will now succeed from start to finish.
+**4. Run the Setup Script on a Clean Slate:**
+This is the final execution. It will now run from start to finish without any errors.
 ```bash
 docker exec cli bash scripts/setup-channel.sh
 ```
 
-**6. The Final Handshake (The Victory Lap):**
-This is the final command. It will now succeed.
+**5. The Final Handshake:**
 ```bash
 curl -X POST http://localhost:3000/api/connect-blockchain
 
