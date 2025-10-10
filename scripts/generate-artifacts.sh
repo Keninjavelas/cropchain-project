@@ -1,23 +1,22 @@
 #!/bin/bash
 
-echo "========= Generating Crypto Material and Genesis Block (Final, Corrected Version) ========="
+echo "========= Generating Crypto Material and Genesis Block (Final, Aggressive Clean) ========="
 
 # Make sure we are in the project root for consistent paths
 cd "$(dirname "$0")/.."
 
-# STEP 1: Fix all file permissions to prevent any "Permission denied" errors.
-echo "-----> Taking ownership of all project files..."
-sudo chown -R $(whoami) .
-
 # Set the environment variable for the config files
 export FABRIC_CFG_PATH=${PWD}/fabric-network
 
-# Clean up any old materials using sudo to ensure it works
+# --- THIS IS THE CRITICAL FIX ---
+# Clean up any old materials, including the stale CA database.
+echo "-----> Cleaning up old artifacts and stale CA database..."
 sudo rm -rf fabric-network/crypto-config
 sudo rm -rf fabric-network/channel-artifacts/*
+sudo rm -rf wallet # Also remove the app's wallet for a true clean start
 mkdir -p fabric-network/channel-artifacts
 
-# STEP 2: Generate Crypto Material using the direct path to the binary
+# Generate Crypto Material using the direct path
 echo "-----> Generating crypto material..."
 ./bin/cryptogen generate --config=./fabric-network/crypto-config.yaml --output="fabric-network/crypto-config"
 if [ $? -ne 0 ]; then
@@ -25,7 +24,7 @@ if [ $? -ne 0 ]; then
   exit 1
 fi
 
-# STEP 3: Generate Genesis Block using the direct path to the binary
+# Generate Genesis Block using the direct path
 echo "-----> Generating genesis block..."
 ./bin/configtxgen -profile CropChainOrdererGenesis -channelID system-channel -outputBlock ./fabric-network/channel-artifacts/genesis.block
 if [ $? -ne 0 ]; then
@@ -33,7 +32,7 @@ if [ $? -ne 0 ]; then
   exit 1
 fi
 
-# STEP 4: Generate Channel Transaction using the direct path to the binary
+# Generate Channel Transaction using the direct path
 echo "-----> Generating channel configuration transaction..."
 ./bin/configtxgen -profile CropChainChannel -outputCreateChannelTx ./fabric-network/channel-artifacts/cropchainchannel.tx -channelID cropchainchannel
 if [ $? -ne 0 ]; then
@@ -41,9 +40,8 @@ if [ $? -ne 0 ]; then
   exit 1
 fi
 
-# --- THIS IS THE CRITICAL FIX ---
-echo "-----> Generating connection profile with correct filenames..."
-# Define the template for our connection profile
+# Generate the connection profile for the application
+echo "-----> Generating connection profile for a NON-TLS network..."
 cat <<EOF > fabric-network/connection-org1.yaml
 ---
 name: cropchain-network-org1
@@ -64,16 +62,15 @@ organizations:
 peers:
   peer0.org1.example.com:
     url: grpc://peer0.org1.example.com:7051
-    # TLS is disabled, so no tlsCACerts needed here for the peer
 certificateAuthorities:
   ca.org1.example.com:
     url: http://ca.org1.example.com:7054
     caName: ca.org1.example.com
     tlsCACerts:
-      # This is the corrected filename
       path: ${PWD}/fabric-network/crypto-config/peerOrganizations/org1.example.com/ca/ca.org1.example.com-cert.pem
     httpOptions:
       verify: false
 EOF
 
 echo "========= Artifact Generation Complete - SUCCESS! ========="
+
