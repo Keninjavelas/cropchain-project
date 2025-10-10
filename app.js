@@ -98,9 +98,6 @@ app.post('/api/products/updateStatus', async (req, res) => {
 async function initializeFabric() {
     console.log('Attempting to initialize Fabric connection...');
     const ccpPath = path.resolve(__dirname, 'fabric-network', 'connection-org1.yaml');
-    if (!fs.existsSync(ccpPath)) {
-        throw new Error(`Connection profile not found at ${ccpPath}. Please ensure it is generated or placed correctly.`);
-    }
     const ccp = yaml.load(fs.readFileSync(ccpPath, 'utf8'));
 
     const walletPath = path.join(__dirname, 'wallet');
@@ -108,13 +105,13 @@ async function initializeFabric() {
 
     const identity = await wallet.get('appUser');
     if (!identity) {
-        console.log('An identity for the user "appUser" does not exist in the wallet. Enrolling now...');
+        console.log('An identity for "appUser" does not exist. Enrolling now...');
         await enrollAppUser(ccp, wallet);
     }
 
     const gateway = new Gateway();
     try {
-        // Use asLocalhost: false because we are in a Docker network
+        // 'asLocalhost' must be false when connecting from one container to another.
         await gateway.connect(ccp, { wallet, identity: 'appUser', discovery: { enabled: true, asLocalhost: false } });
         const network = await gateway.getNetwork('cropchainchannel');
         fabricContract = network.getContract('cropchain');
@@ -129,44 +126,37 @@ async function initializeFabric() {
 async function enrollAppUser(ccp, wallet) {
     try {
         const caInfo = ccp.certificateAuthorities['ca.org1.example.com'];
-        
-        // --- THIS IS THE CRITICAL FIX ---
-        // For a non-TLS connection, the tlsOptions argument must be null.
-        // We are using a simple key for a simple lock.
-        const ca = new FabricCAServices(caInfo.url, null, caInfo.caName);
+        // This is a critical step to establish a trusted connection with the CA
+        const caTLSCACerts = fs.readFileSync(caInfo.tlsCACerts.path, 'utf8');
+        const ca = new FabricCAServices(caInfo.url, { trustedRoots: caTLSCACerts, verify: false }, caInfo.caName);
 
-        // First, enroll the admin if it doesn't exist.
         const adminIdentity = await wallet.get('admin');
         if (!adminIdentity) {
             console.log('Enrolling admin user...');
             const enrollment = await ca.enroll({ enrollmentID: 'admin', enrollmentSecret: 'adminpw' });
             const x509Identity = {
                 credentials: { certificate: enrollment.certificate, privateKey: enrollment.key.toBytes() },
-                mspId: 'Org1MSP',
-                type: 'X.509',
+                mspId: 'Org1MSP', type: 'X.509',
             };
             await wallet.put('admin', x509Identity);
             console.log('Successfully enrolled admin user.');
         }
 
-        // Now, get the admin user object from the wallet to perform the registration
-        const adminProvider = wallet.getProviderRegistry().getProvider('X.509');
-        const adminUser = await adminProvider.getUserContext(await wallet.get('admin'), 'admin');
+        const adminUser = await wallet.get('admin');
+        const provider = wallet.getProviderRegistry().getProvider(adminUser.type);
+        const adminUserContext = await provider.getUserContext(adminUser, 'admin');
         
         // Register the new user ('appUser') using the admin's identity
-        const secret = await ca.register({ affiliation: 'org1.department1', enrollmentID: 'appUser', role: 'client' }, adminUser);
+        const secret = await ca.register({ affiliation: 'org1.department1', enrollmentID: 'appUser', role: 'client' }, adminUserContext);
         
         // Enroll the new user
         const enrollment = await ca.enroll({ enrollmentID: 'appUser', enrollmentSecret: secret });
-        
-        // Store the new user's identity in the wallet
         const x509Identity = {
             credentials: { certificate: enrollment.certificate, privateKey: enrollment.key.toBytes() },
-            mspId: 'Org1MSP',
-            type: 'X.509',
+            mspId: 'Org1MSP', type: 'X.509',
         };
         await wallet.put('appUser', x509Identity);
-        console.log('Successfully registered and enrolled "appUser".');
+        console.log('Successfully enrolled and saved "appUser" to wallet.');
 
     } catch (error) {
         console.error(`Failed to enroll app user: ${error}`);
@@ -180,8 +170,7 @@ async function enrollAppUser(ccp, wallet) {
 const PORT = 3000;
 app.listen(PORT, async () => {
     console.log(`Server is running on port ${PORT}`);
-    console.log('Application is running in a stable, lightweight mode.');
-    console.log('Blockchain features are currently disabled.');
+    console.log('Application running in lightweight mode.');
     
     try {
         const { create } = await import('ipfs-http-client');
@@ -191,3 +180,4 @@ app.listen(PORT, async () => {
         console.error('Could not connect to IPFS client:', error);
     }
 });
+

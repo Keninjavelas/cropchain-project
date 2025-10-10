@@ -54,7 +54,6 @@ services:
     ports:
       - "7051:7051"
 
-  # --- THIS IS THE CRITICAL FIX ---
   ca.org1.example.com:
     image: hyperledger/fabric-ca:1.5.0
     container_name: ca.org1.example.com
@@ -89,7 +88,7 @@ services:
     command: /bin/sh -c 'sleep infinity'
     volumes:
       - /var/run/:/host/var/run/
-      - ../:/workspace
+      - ./:/workspace # Mount the entire project
       - ./fabric-network/crypto-config:/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/
       - ./chaincode:/opt/gopath/src/github.com/hyperledger/fabric/peer/chaincode/
       - ./scripts:/opt/gopath/src/github.com/hyperledger/fabric/peer/scripts/
