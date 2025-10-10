@@ -114,6 +114,7 @@ async function initializeFabric() {
 
     const gateway = new Gateway();
     try {
+        // Use asLocalhost: false because we are in a Docker network
         await gateway.connect(ccp, { wallet, identity: 'appUser', discovery: { enabled: true, asLocalhost: false } });
         const network = await gateway.getNetwork('cropchainchannel');
         fabricContract = network.getContract('cropchain');
@@ -128,12 +129,11 @@ async function initializeFabric() {
 async function enrollAppUser(ccp, wallet) {
     try {
         const caInfo = ccp.certificateAuthorities['ca.org1.example.com'];
-
+        
         // --- THIS IS THE CRITICAL FIX ---
-        // Instead of hardcoding a wrong filename, we now correctly use the path from the connection profile.
-        const caCert = fs.readFileSync(caInfo.tlsCACerts.path, 'utf8');
-        const tlsOptions = { trustedRoots: [caCert], verify: false };
-        const ca = new FabricCAServices(caInfo.url, tlsOptions, caInfo.caName);
+        // For a non-TLS connection, the tlsOptions argument must be null.
+        // We are using a simple key for a simple lock.
+        const ca = new FabricCAServices(caInfo.url, null, caInfo.caName);
 
         // First, enroll the admin if it doesn't exist.
         const adminIdentity = await wallet.get('admin');
