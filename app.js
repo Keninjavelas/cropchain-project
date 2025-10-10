@@ -128,11 +128,9 @@ async function initializeFabric() {
 async function enrollAppUser(ccp, wallet) {
     try {
         const caInfo = ccp.certificateAuthorities['ca.org1.example.com'];
-        
-        // --- THIS IS THE CRITICAL FIX ---
-        // For a non-TLS connection, we do not need to provide TLS certificate options.
         const ca = new FabricCAServices(caInfo.url, undefined, caInfo.caName);
 
+        // First, enroll the admin if it doesn't exist.
         const adminIdentity = await wallet.get('admin');
         if (!adminIdentity) {
             console.log('Enrolling admin user...');
@@ -140,28 +138,30 @@ async function enrollAppUser(ccp, wallet) {
             const x509Identity = {
                 credentials: { certificate: enrollment.certificate, privateKey: enrollment.key.toBytes() },
                 mspId: 'Org1MSP',
-                type: 'X.09',
+                type: 'X.509', // Corrected from X.09
             };
             await wallet.put('admin', x509Identity);
             console.log('Successfully enrolled admin user.');
         }
 
-        const adminGateway = new Gateway();
-        await adminGateway.connect(ccp, { wallet, identity: 'admin', discovery: { enabled: true, asLocalhost: false } });
-        const adminService = adminGateway.getClient().getCertificateAuthority();
-        const provider = wallet.getProviderRegistry().getProvider(adminIdentity.type);
-        const adminUser = await provider.getUserContext(adminIdentity, 'admin');
-
-        const secret = await adminService.register({ affiliation: 'org1.department1', enrollmentID: 'appUser', role: 'client' }, adminUser);
+        // Now, get the admin user object from the wallet to perform the registration
+        const adminProvider = wallet.getProviderRegistry().getProvider('X.509');
+        const adminUser = await adminProvider.getUserContext(await wallet.get('admin'), 'admin');
+        
+        // Register the new user ('appUser') using the admin's identity
+        const secret = await ca.register({ affiliation: 'org1.department1', enrollmentID: 'appUser', role: 'client' }, adminUser);
+        
+        // Enroll the new user
         const enrollment = await ca.enroll({ enrollmentID: 'appUser', enrollmentSecret: secret });
+        
+        // Store the new user's identity in the wallet
         const x509Identity = {
             credentials: { certificate: enrollment.certificate, privateKey: enrollment.key.toBytes() },
             mspId: 'Org1MSP',
-            type: 'X.09',
+            type: 'X.509', // Corrected from X.09
         };
         await wallet.put('appUser', x509Identity);
         console.log('Successfully registered and enrolled "appUser".');
-        adminGateway.disconnect();
 
     } catch (error) {
         console.error(`Failed to enroll app user: ${error}`);
