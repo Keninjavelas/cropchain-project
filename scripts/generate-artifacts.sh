@@ -1,17 +1,21 @@
 #!/bin/bash
 
-echo "========= Generating Crypto Material and Genesis Block ========="
+echo "========= Generating Crypto Material and Genesis Block (Final, Corrected Version) ========="
 
-# Navigate to the project root to ensure consistent paths
+# Make sure we are in the project root for consistent paths
 cd "$(dirname "$0")/.."
 
-# Clean up old artifacts for a fresh start
+# STEP 1: Aggressively clean up all old, stale data.
+echo "-----> Cleaning up old artifacts, stale CA database, and wallet..."
 sudo rm -rf fabric-network/crypto-config
 sudo rm -rf fabric-network/channel-artifacts/*
 sudo rm -rf wallet
 mkdir -p fabric-network/channel-artifacts
 
-# Generate the crypto material for peers and orderers
+# Set the environment variable for the config files
+export FABRIC_CFG_PATH=${PWD}/fabric-network
+
+# STEP 2: Generate Crypto Material using the direct path to the binary
 echo "-----> Generating crypto material..."
 ./bin/cryptogen generate --config=./fabric-network/crypto-config.yaml --output="fabric-network/crypto-config"
 if [ $? -ne 0 ]; then
@@ -19,10 +23,7 @@ if [ $? -ne 0 ]; then
   exit 1
 fi
 
-# Set the path for the configuration tool
-export FABRIC_CFG_PATH=${PWD}/fabric-network
-
-# Generate the genesis block for the ordering service
+# STEP 3: Generate Genesis Block using the direct path to the binary
 echo "-----> Generating genesis block..."
 ./bin/configtxgen -profile CropChainOrdererGenesis -channelID system-channel -outputBlock ./fabric-network/channel-artifacts/genesis.block
 if [ $? -ne 0 ]; then
@@ -30,13 +31,48 @@ if [ $? -ne 0 ]; then
   exit 1
 fi
 
-# Generate the channel transaction file
+# STEP 4: Generate Channel Transaction using the direct path to the binary
 echo "-----> Generating channel configuration transaction..."
 ./bin/configtxgen -profile CropChainChannel -outputCreateChannelTx ./fabric-network/channel-artifacts/cropchainchannel.tx -channelID cropchainchannel
 if [ $? -ne 0 ]; then
   echo "ERROR: Failed to generate channel configuration transaction."
   exit 1
 fi
+
+# STEP 5: Generate the connection profile with the correct filenames
+echo "-----> Generating connection profile with correct filenames..."
+cat <<EOF > fabric-network/connection-org1.yaml
+---
+name: cropchain-network-org1
+version: 1.0.0
+client:
+  organization: Org1
+  connection:
+    timeout:
+      peer:
+        endorser: '300'
+organizations:
+  Org1:
+    mspid: Org1MSP
+    peers:
+      - peer0.org1.example.com
+    certificateAuthorities:
+      - ca.org1.example.com
+peers:
+  peer0.org1.example.com:
+    url: grpc://peer0.org1.example.com:7051
+    # TLS is disabled, no certs needed here for the peer.
+certificateAuthorities:
+  ca.org1.example.com:
+    # THIS IS THE CRITICAL FIX: Use the correct service name
+    url: http://ca.org1.example.com:7054 
+    caName: ca.org1.example.com
+    tlsCACerts:
+      # This is the corrected filename that cryptogen actually creates.
+      path: ${PWD}/fabric-network/crypto-config/peerOrganizations/org1.example.com/ca/ca.org1.example.com-cert.pem
+    httpOptions:
+      verify: false
+EOF
 
 echo "========= Artifact Generation Complete - SUCCESS! ========="
 
