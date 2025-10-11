@@ -3,7 +3,7 @@ version: '3.7'
 volumes:
   mysql_data:
   ipfs_data:
-  ca_data:
+  # ca_data is no longer needed with this new configuration
 
 networks:
   default:
@@ -54,8 +54,7 @@ services:
     ports:
       - "7051:7051"
 
-  # --- THIS IS THE CRITICAL FIX ---
-  # The service name is now 'ca_org1' to match what the app and scripts are calling.
+  # --- THIS IS THE CRITICAL CHANGE ---
   ca_org1:
     image: hyperledger/fabric-ca:1.5.0
     container_name: ca_org1
@@ -63,11 +62,15 @@ services:
       - FABRIC_CA_HOME=/etc/hyperledger/fabric-ca-server
       - FABRIC_CA_SERVER_CA_NAME=ca-org1
       - FABRIC_CA_SERVER_PORT=7054
+      # These two lines force the CA to use the correct, cryptogen-created identity.
+      - FABRIC_CA_SERVER_CA_CERTFILE=/etc/hyperledger/fabric-ca-server/ca.org1.example.com-cert.pem
+      - FABRIC_CA_SERVER_CA_KEYFILE=/etc/hyperledger/fabric-ca-server/msp/keystore/*_sk
     ports:
       - "7054:7054"
     command: sh -c 'fabric-ca-server start -b admin:adminpw -d'
     volumes:
-      - ca_data:/etc/hyperledger/fabric-ca-server
+      # We now mount the CA directory from the generated crypto-config to ensure all files are available.
+      - ./fabric-network/crypto-config/peerOrganizations/org1.example.com/ca/:/etc/hyperledger/fabric-ca-server
 
   cli:
     container_name: cli
@@ -126,5 +129,4 @@ services:
       - "8080:8080"
     volumes:
       - ipfs_data:/data/ipfs
-
 
