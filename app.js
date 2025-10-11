@@ -26,21 +26,20 @@ app.post('/api/connect-blockchain', async (req, res) => {
         res.json({ success: true, message: 'Successfully connected to the blockchain network.' });
     } catch (error) {
         console.error(`Connect error: ${error}`);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: `Failed to connect to blockchain: ${error.message}` });
     }
 });
 
+// All other API endpoints remain the same...
 app.post('/api/products/create', async (req, res) => {
     if (!fabricContract) return res.status(503).json({ error: 'Blockchain not initialized.' });
     try {
-        const { id, origin, product, status, owner } = req.body;
-        await fabricContract.submitTransaction('CreateProduct', id, product, origin, owner, status);
-        res.status(201).json({ success: true, message: `Product ${id} created.` });
+        await fabricContract.submitTransaction('CreateProduct', req.body.id, req.body.product, req.body.origin, req.body.owner, req.body.status);
+        res.status(201).json({ success: true });
     } catch (error) {
         res.status(500).json({ success: false, error: error.toString() });
     }
 });
-
 app.get('/api/products/queryAll', async (req, res) => {
     if (!fabricContract) return res.status(503).json({ error: 'Blockchain not initialized.' });
     try {
@@ -50,7 +49,6 @@ app.get('/api/products/queryAll', async (req, res) => {
         res.status(500).json({ success: false, error: error.toString() });
     }
 });
-
 app.get('/api/products/:id', async (req, res) => {
     if (!fabricContract) return res.status(503).json({ error: 'Blockchain not initialized.' });
     try {
@@ -60,12 +58,11 @@ app.get('/api/products/:id', async (req, res) => {
         res.status(500).json({ success: false, error: error.toString() });
     }
 });
-
 app.post('/api/products/updateStatus', async (req, res) => {
     if (!fabricContract) return res.status(503).json({ error: 'Blockchain not initialized.' });
     try {
         await fabricContract.submitTransaction('UpdateProductStatus', req.body.id, req.body.newStatus);
-        res.json({ success: true, message: `Status updated for ${req.body.id}.` });
+        res.json({ success: true });
     } catch (error) {
         res.status(500).json({ success: false, error: error.toString() });
     }
@@ -73,63 +70,16 @@ app.post('/api/products/updateStatus', async (req, res) => {
 
 
 async function initializeFabric() {
+    const ccpPath = path.resolve(__dirname, 'fabric-network', 'connection-org1.yaml');
+    const ccp = yaml.load(fs.readFileSync(ccpPath, 'utf8'));
+
     const walletPath = path.join(__dirname, 'wallet');
     const wallet = await Wallets.newFileSystemWallet(walletPath);
 
-    // This is the key: The connection profile is now generated dynamically
-    // based on the CA's self-generated certificate.
-    const caCertPath = path.resolve(__dirname, 'fabric-network', 'ca-cert.pem');
-    
-    // Retry mechanism to wait for the CA to be ready and for the cert to be copied
-    let retries = 5;
-    while (retries > 0) {
-        if (fs.existsSync(caCertPath)) break;
-        console.log('CA certificate not found, waiting 5 seconds...');
-        await new Promise(resolve => setTimeout(resolve, 5000));
-        retries--;
-    }
-    if (!fs.existsSync(caCertPath)) {
-        throw new Error('CA certificate file not found after multiple retries. Ensure the `docker cp` command was successful.');
-    }
-    
-    const caCert = fs.readFileSync(caCertPath, 'utf8');
-    
-    // Dynamically build the connection profile
-    const ccp = {
-        client: { 
-            organization: 'Org1',
-            connection: {
-                timeout: {
-                    peer: { endorser: '300' }
-                }
-            }
-        },
-        organizations: { 
-            Org1: { 
-                mspid: 'Org1MSP', 
-                peers: ['peer0.org1.example.com'],
-                certificateAuthorities: ['ca-org1']
-            } 
-        },
-        peers: { 
-            'peer0.org1.example.com': { 
-                url: 'grpc://peer0.org1.example.com:7051',
-                // TLS is disabled for the peer, so no tlsCACerts needed here
-            } 
-        },
-        certificateAuthorities: { 
-            'ca-org1': { 
-                url: 'http://ca_org1:7054', 
-                caName: 'ca-org1', 
-                tlsCACerts: { pem: caCert },
-                httpOptions: { verify: false }
-            } 
-        }
-    };
-    
-    let appUser = await wallet.get('appUser');
-    if (!appUser) {
-        await enrollAppUser(wallet, ccp);
+    const appUserIdentity = await wallet.get('appUser');
+    if (!appUserIdentity) {
+        console.log('An identity for "appUser" does not exist. Enrolling now...');
+        await enrollAppUser(ccp, wallet);
     }
 
     const gateway = new Gateway();
@@ -139,31 +89,40 @@ async function initializeFabric() {
     console.log('Fabric connection initialized successfully.');
 }
 
-async function enrollAppUser(wallet, ccp) {
-    const caInfo = ccp.certificateAuthorities['ca-org1'];
-    const ca = new FabricCAServices(caInfo.url, { trustedRoots: caInfo.tlsCACerts.pem, verify: false }, caInfo.caName);
+async function enrollAppUser(ccp, wallet) {
+    try {
+        const caInfo = ccp.certificateAuthorities['ca.org1.example.com'];
+        // This is the key: we read the correct certificate path from the connection profile.
+        const caTLSCACerts = fs.readFileSync(caInfo.tlsCACerts.path, 'utf8');
+        const ca = new FabricCAServices(caInfo.url, { trustedRoots: caTLSCACerts, verify: false }, caInfo.caName);
 
-    let admin = await wallet.get('admin');
-    if (!admin) {
-        const enrollment = await ca.enroll({ enrollmentID: 'admin', enrollmentSecret: 'adminpw' });
+        const adminIdentity = await wallet.get('admin');
+        if (!adminIdentity) {
+            console.log('Enrolling admin user...');
+            const enrollment = await ca.enroll({ enrollmentID: 'admin', enrollmentSecret: 'adminpw' });
+            const x509Identity = {
+                credentials: { certificate: enrollment.certificate, privateKey: enrollment.key.toBytes() },
+                mspId: 'Org1MSP', type: 'X.509',
+            };
+            await wallet.put('admin', x509Identity);
+        }
+
+        const adminUser = await wallet.get('admin');
+        const provider = wallet.getProviderRegistry().getProvider(adminUser.type);
+        const adminUserContext = await provider.getUserContext(adminUser, 'admin');
+        
+        const secret = await ca.register({ affiliation: 'org1.department1', enrollmentID: 'appUser', role: 'client' }, adminUserContext);
+        const enrollment = await ca.enroll({ enrollmentID: 'appUser', enrollmentSecret: secret });
         const x509Identity = {
             credentials: { certificate: enrollment.certificate, privateKey: enrollment.key.toBytes() },
             mspId: 'Org1MSP', type: 'X.509',
         };
-        await wallet.put('admin', x509Identity);
-        admin = await wallet.get('admin');
+        await wallet.put('appUser', x509Identity);
+        console.log('Successfully enrolled and saved "appUser" to wallet.');
+    } catch (error) {
+        console.error(`Failed to enroll app user: ${error}`);
+        throw error;
     }
-
-    const provider = wallet.getProviderRegistry().getProvider(admin.type);
-    const adminUser = await provider.getUserContext(admin, 'admin');
-
-    const secret = await ca.register({ affiliation: 'org1.department1', enrollmentID: 'appUser', role: 'client' }, adminUser);
-    const enrollment = await ca.enroll({ enrollmentID: 'appUser', enrollmentSecret: secret });
-    const x509Identity = {
-        credentials: { certificate: enrollment.certificate, privateKey: enrollment.key.toBytes() },
-        mspId: 'Org1MSP', type: 'X.509',
-    };
-    await wallet.put('appUser', x509Identity);
 }
 
 const PORT = 3000;

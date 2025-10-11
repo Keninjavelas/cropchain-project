@@ -64,8 +64,7 @@ peers:
     # TLS is disabled, no certs needed here for the peer.
 certificateAuthorities:
   ca.org1.example.com:
-    # THIS IS THE CRITICAL FIX: Use the correct service name
-    url: http://ca.org1.example.com:7054 
+    url: http://ca.org1.example.com:7054
     caName: ca.org1.example.com
     tlsCACerts:
       # This is the corrected filename that cryptogen actually creates.
