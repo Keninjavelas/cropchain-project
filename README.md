@@ -1,102 +1,105 @@
-CropChain: A Hybrid Blockchain Application for Agricultural Traceability
-CropChain is a full-stack application demonstrating a traceability solution for agricultural products using a hybrid approach. It leverages Hyperledger Fabric for an immutable audit trail, MySQL for scalable off-chain data storage, and IPFS for decentralized file storage.
+## CropChain: Hybrid Blockchain for Agricultural Traceability 🌾
 
-This project is configured to run seamlessly within a GitHub Codespaces environment.
+**CropChain** is a comprehensive, full-stack application that tackles **agricultural product traceability** using a **hybrid blockchain architecture**. It provides an unchangeable and verifiable audit trail for produce, from farm to consumer.
 
-Core Technologies
-Blockchain: Hyperledger Fabric (v2.2)
+### Key Features & Technology Stack
 
-Backend: Node.js, Express.js
+CropChain combines several cutting-edge technologies to create a robust and scalable solution:
 
-Frontend: React (served statically by the backend)
+| Feature | Technology | Role |
+| :--- | :--- | :--- |
+| **Immutable Audit Trail** | **Hyperledger Fabric (v2.2)** | Provides a private, permissioned blockchain for secure, unchangeable transaction records (on-chain data). |
+| **Scalable Data Storage** | **MySQL** | Used for efficient, high-volume storage of off-chain data. |
+| **Decentralized File Storage** | **InterPlanetary File System (IPFS)** | Ensures tamper-proof and decentralized storage for files like certificates and quality reports. |
+| **Backend API** | **Node.js/Express.js** | Manages server-side logic and exposes the RESTful API endpoints. |
+| **Frontend UI** | **React** | Provides a dynamic, modern user interface for interacting with the system. |
+| **Containerization** | **Docker/Docker Compose** | Simplifies deployment and ensures a consistent environment for all services. |
+| **Development Environment** | **GitHub Codespaces** | Pre-configured environment for seamless, zero-setup development and deployment. |
 
-Database: MySQL
+-----
 
-File Storage: InterPlanetary File System (IPFS)
+### Getting Started in GitHub Codespaces 🚀
 
-Containerization: Docker, Docker Compose
+This project is fully configured to run immediately within a **GitHub Codespaces** environment.
 
-Environment: GitHub Codespaces
+#### 1\. Open in Codespaces
 
-Project Structure
-.
-├── .devcontainer/
-│   └── devcontainer.json   # Codespaces configuration
-├── .env                    # Environment variables
-├── app.js                  # Main Node.js/Express application
-├── chaincode/              # Hyperledger Fabric Smart Contract (Go)
-├── db/
-│   └── init.sql            # MySQL initialization script
-├── docker-compose.yml      # Main Docker Compose file
-├── Dockerfile              # Dockerfile for the main app container
-├── fabric-network/         # Fabric network configuration files
-├── package.json            # Backend dependencies
-├── README.md               # This file
-└── scripts/
-    └── setup-fabric.sh     # Fabric network setup script
-└── ui/                     # React frontend source code
+Simply open this repository in a new GitHub Codespace. The setup relies on files in `.devcontainer/` and the main `Dockerfile` to automatically configure the necessary environment, including dependencies and tools.
 
-How to Run in GitHub Codespaces
-Open in Codespaces: Open this repository in a new GitHub Codespace. The environment will be automatically configured based on .devcontainer/devcontainer.json and the Dockerfile.
+#### 2\. Automatic Service Startup & Network Setup
 
-Start Services: The postCreateCommand in devcontainer.json will automatically run docker-compose up -d. This will start all the necessary services:
+Upon creating the Codespace, the `postCreateCommand` executes, performing several critical steps:
 
-Hyperledger Fabric Network (Orderer, Peers, Certificate Authority)
+1.  **Starts Services:** `docker-compose up -d` brings up all core components:
+      * Hyperledger Fabric Network (Peers, Orderer, CA)
+      * MySQL Database
+      * IPFS Daemon
+      * The main Node.js Application container (running via `nodemon`).
+2.  **Sets Up Fabric:** The `scripts/setup-fabric.sh` script runs automatically to handle the one-time network configuration:
+      * Enrolls the organization's admin user.
+      * Creates the **`cropchainchannel`**.
+      * Packages, installs, and approves the Fabric Smart Contract (chaincode) written in Go.
 
-MySQL Database
+#### 3\. Install Dependencies & Build UI
 
-IPFS Daemon
+While the backend services are running, you must install dependencies and build the static frontend assets. Open a terminal in Codespaces and run these commands:
 
-The Node.js application container
-
-Setup Fabric Network: The Docker Compose setup will automatically execute the scripts/setup-fabric.sh script. This script performs the following critical one-time setup tasks:
-
-Waits for the Fabric CA to be ready.
-
-Enrolls an admin user for the organization.
-
-Creates a channel named cropchainchannel.
-
-Packages, installs, and approves the smart contract on the channel.
-
-Install Dependencies & Build UI: Open a terminal within Codespaces and run the following commands:
-
-# Install backend dependencies
+```bash
+# Install backend (Node.js/Express) dependencies
 npm install
 
-# Navigate to the UI directory
+# Navigate to UI directory
 cd ui
 
-# Install frontend dependencies
+# Install frontend (React) dependencies
 npm install
 
-# Build the React application for production
+# Build the production-ready React application
 npm run build
 
-# Go back to the root directory
+# Return to the root directory
 cd ..
+```
 
-Start the Application: The application should already be running via the docker-compose setup using nodemon for auto-reloading. You can check the logs:
+#### 4\. Access the Application
 
-docker-compose logs -f app
+The Node.js application is running on port **3000**. Codespaces will automatically detect this and provide a prompt to **Open in Browser**.
 
-If it's not running, start it manually:
+  * The **CropChain UI** will load, allowing you to begin interacting with the traceability system.
+  * You can monitor the application logs using: `docker-compose logs -f app`
+  * *(Optional: If the app isn't running, start it manually with `npm start`)*
 
-npm start
+-----
 
-Access the Application: Codespaces will automatically detect the running application on port 3000 and prompt you to open it in a browser. The CropChain UI will be available, allowing you to interact with the system.
+### Project Structure Overview
 
-API Endpoints
-The app.js server exposes the following REST API endpoints:
+```
+.
+├── .devcontainer/       # Codespaces configuration (devcontainer.json)
+├── .env                 # Environment variables
+├── app.js               # Main Node.js/Express server
+├── chaincode/           # Hyperledger Fabric Smart Contract (Go)
+├── db/                  # MySQL initialization script (init.sql)
+├── docker-compose.yml   # Defines all services (Fabric, MySQL, IPFS, App)
+├── Dockerfile           # Dockerfile for the main application container
+├── fabric-network/      # Fabric network configuration files
+├── scripts/             # Fabric network setup script (setup-fabric.sh)
+├── ui/                  # React frontend source code
+├── package.json         # Backend dependencies
+└── README.md            # This file
+```
 
-POST /api/products: Create a new product.
+-----
 
-POST /api/products/:id/ship: Mark a product as shipped.
+### REST API Endpoints
 
-POST /api/products/:id/receive: Mark a product as received.
+The backend server exposes the following endpoints for product management and traceability:
 
-GET /api/products/:id/history: Retrieve the full on-chain history for a product.
-
-GET /api/products/:id/qrcode: Get a QR code image for a product's history URL.
-
-POST /api/upload: Upload a file (e.g., certificate) to IPFS.
+| Method | Endpoint | Description |
+| :--- | :--- | :--- |
+| `POST` | `/api/products` | Create a new agricultural product record. |
+| `POST` | `/api/products/:id/ship` | Mark an existing product as shipped. |
+| `POST` | `/api/products/:id/receive` | Mark an existing product as received. |
+| `GET` | `/api/products/:id/history` | Retrieve the complete on-chain history for a product. |
+| `GET` | `/api/products/:id/qrcode` | Generate a QR code image for a product's history URL. |
+| `POST` | `/api/upload` | Upload a file (e.g., quality certificate) to **IPFS**. |
