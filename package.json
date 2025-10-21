@@ -4,12 +4,12 @@
   "description": "Backend for CropChain Application",
   "main": "app.js",
   "scripts": {
-    "start": "nodemon app.js"
+    "start": "node app.js",
+    "dev": "nodemon app.js"
   },
   "dependencies": {
     "axios": "^1.2.0",
     "cors": "^2.8.5",
-    "crypto": "^1.0.1",
     "express": "^4.18.2",
     "express-fileupload": "^1.4.0",
     "fabric-ca-client": "~2.2.0",
@@ -18,7 +18,9 @@
     "ipfs-http-client": "^59.0.0",
     "js-yaml": "^4.1.0",
     "mysql2": "^2.3.3",
-    "nodemon": "^2.0.20",
     "qrcode": "^1.5.1"
+  },
+  "devDependencies": {
+    "nodemon": "^2.0.20"
   }
 }

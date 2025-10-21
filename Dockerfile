@@ -13,5 +13,16 @@ COPY package*.json ./
 # Install application dependencies
 RUN npm install
 
-# Copy the rest of the application code
+# Copy the rest of the application code (excluding node_modules)
 COPY . .
+
+# Build the React UI
+WORKDIR /workspace/ui
+RUN npm install
+RUN npm run build
+
+# Return to workspace root
+WORKDIR /workspace
+
+# Set the default command
+CMD ["node", "app.js"]

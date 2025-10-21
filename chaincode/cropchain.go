@@ -16,12 +16,13 @@ type SmartContract struct {
 // Product describes basic details of what is being tracked
 type Product struct {
 	ID                 string `json:"ID"`
-	Type               string `json:"type"`
-	Farmer             string `json:"farmer"`
-	Owner              string `json:"owner"`
-	Timestamp          int64  `json:"timestamp"`
-	MarketPriceHash    string `json:"marketPriceHash"`
-	CertificationIPFSHash string `json:"certificationIPFSHash"`
+	Type               string `json:"Type"`
+	Farmer             string `json:"Farmer"`
+	Owner              string `json:"Owner"`
+	Timestamp          int64  `json:"Timestamp"`
+	MarketPriceHash    string `json:"MarketPriceHash"`
+	CertificationIPFSHash string `json:"CertificationIPFSHash"`
+    Status             string `json:"Status"`
 }
 
 // HistoryQueryResult structure used for returning history of a product
@@ -50,6 +51,7 @@ func (s *SmartContract) CreateProduct(ctx contractapi.TransactionContextInterfac
 		Timestamp:          time.Now().Unix(),
 		MarketPriceHash:    marketPriceHash,
 		CertificationIPFSHash: certHash,
+        Status:             "CREATED",
 	}
 	productJSON, err := json.Marshal(product)
 	if err != nil {
@@ -68,6 +70,7 @@ func (s *SmartContract) ShipProduct(ctx contractapi.TransactionContextInterface,
 
 	product.Owner = newOwner
 	product.Timestamp = time.Now().Unix()
+    product.Status = "SHIPPED"
 
 	productJSON, err := json.Marshal(product)
 	if err != nil {
@@ -80,7 +83,21 @@ func (s *SmartContract) ShipProduct(ctx contractapi.TransactionContextInterface,
 // ReceiveProduct is functionally similar to ShipProduct but represents the end of a transfer.
 // This allows for a clear "receive" event in the product's history.
 func (s *SmartContract) ReceiveProduct(ctx contractapi.TransactionContextInterface, id string, newOwner string) error {
-    return s.ShipProduct(ctx, id, newOwner) // Re-use the same logic to update owner
+	product, err := s.ReadProduct(ctx, id)
+	if err != nil {
+		return err
+	}
+
+	product.Owner = newOwner
+	product.Timestamp = time.Now().Unix()
+    product.Status = "RECEIVED"
+
+	productJSON, err := json.Marshal(product)
+	if err != nil {
+		return err
+	}
+
+	return ctx.GetStub().PutState(id, productJSON)
 }
 
 // ReadProduct returns the product stored in the world state with given id.
@@ -100,6 +117,11 @@ func (s *SmartContract) ReadProduct(ctx contractapi.TransactionContextInterface,
 	}
 
 	return &product, nil
+}
+
+// QueryProduct is an alias for ReadProduct for client clarity
+func (s *SmartContract) QueryProduct(ctx contractapi.TransactionContextInterface, id string) (*Product, error) {
+    return s.ReadProduct(ctx, id)
 }
 
 // ProductExists returns true when product with given ID exists in world state
@@ -148,6 +170,47 @@ func (s *SmartContract) GetProductHistory(ctx contractapi.TransactionContextInte
 	}
 
 	return records, nil
+}
+
+// UpdateProductStatus updates only the status field for a product
+func (s *SmartContract) UpdateProductStatus(ctx contractapi.TransactionContextInterface, id string, newStatus string) error {
+    product, err := s.ReadProduct(ctx, id)
+    if err != nil {
+        return err
+    }
+    product.Status = newStatus
+    product.Timestamp = time.Now().Unix()
+
+    productJSON, err := json.Marshal(product)
+    if err != nil {
+        return err
+    }
+    return ctx.GetStub().PutState(id, productJSON)
+}
+
+// QueryAllProducts returns all products stored in world state
+func (s *SmartContract) QueryAllProducts(ctx contractapi.TransactionContextInterface) ([]*Product, error) {
+    resultsIterator, err := ctx.GetStub().GetStateByRange("", "")
+    if err != nil {
+        return nil, err
+    }
+    defer resultsIterator.Close()
+
+    var products []*Product
+    for resultsIterator.HasNext() {
+        response, err := resultsIterator.Next()
+        if err != nil {
+            return nil, err
+        }
+        var p Product
+        if len(response.Value) > 0 {
+            if err := json.Unmarshal(response.Value, &p); err != nil {
+                return nil, err
+            }
+            products = append(products, &p)
+        }
+    }
+    return products, nil
 }
 
 func main() {

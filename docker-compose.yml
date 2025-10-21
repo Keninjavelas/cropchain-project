@@ -1,8 +1,7 @@
-version: '3.7'
-
 volumes:
   mysql_data:
   ipfs_data:
+  wallet_data:
 
 networks:
   default:
@@ -98,11 +97,14 @@ services:
     ports:
       - "3000:3000"
     volumes:
-      - .:/workspace
-    command: npm start
+      - wallet_data:/workspace/wallet
     depends_on:
       - peer0.org1.example.com
       - orderer.example.com
+      - mysql
+      - ipfs
+    networks:
+      - default
 
   mysql:
     image: mysql:8.0
@@ -118,6 +120,8 @@ services:
     volumes:
       - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql
       - mysql_data:/var/lib/mysql
+    networks:
+      - default
 
   ipfs:
     image: ipfs/go-ipfs:latest
@@ -128,4 +132,6 @@ services:
       - "8080:8080"
     volumes:
       - ipfs_data:/data/ipfs
+    networks:
+      - default
 
