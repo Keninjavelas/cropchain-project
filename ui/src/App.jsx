@@ -47,8 +47,8 @@ const Button = ({ children, onClick, disabled = false, variant = "primary", size
     };
     
     return (
-        <button
-            onClick={onClick}
+    <button
+        onClick={onClick}
             disabled={disabled || loading}
             className={`${baseClasses} ${variants[variant]} ${sizes[size]} ${className}`}
         >
@@ -58,8 +58,8 @@ const Button = ({ children, onClick, disabled = false, variant = "primary", size
                     Loading...
                 </div>
             ) : children}
-        </button>
-    );
+    </button>
+);
 };
 
 const StatusBadge = ({ status }) => {
@@ -381,7 +381,7 @@ function App() {
                             </button>
                         ))}
                     </div>
-                </div>
+                    </div>
             </nav>
 
             {/* Main Content */}
@@ -392,7 +392,7 @@ function App() {
 
                 {/* Create Product Tab */}
                 {activeTab === 'create' && (
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                         <Card title="Create New Product" icon="🌱">
                             <div className="space-y-4">
                                 <Input 
@@ -455,7 +455,7 @@ function App() {
                                             )}
                                         </div>
                                     )}
-                                </div>
+                        </div>
 
                                 <Button 
                                     onClick={createProduct} 
@@ -466,7 +466,7 @@ function App() {
                                     Create Product on Blockchain
                                 </Button>
                             </div>
-                        </Card>
+                    </Card>
 
                         <div className="space-y-6">
                             <Card title="Ship Product" icon="🚚">
@@ -493,8 +493,8 @@ function App() {
                                         Ship Product
                                     </Button>
                                 </div>
-                            </Card>
-                            
+                        </Card>
+                        
                             <Card title="Receive Product" icon="✅">
                                 <div className="space-y-4">
                                     <Input 
@@ -519,8 +519,8 @@ function App() {
                                         Receive Product
                                     </Button>
                                 </div>
-                            </Card>
-                        </div>
+                        </Card>
+                    </div>
                     </div>
                 )}
 
@@ -538,7 +538,7 @@ function App() {
                                         required
                                     />
                                 </div>
-                                <div className="flex items-end">
+                        <div className="flex items-end">
                                     <Button 
                                         onClick={getHistory} 
                                         loading={loading}
@@ -546,10 +546,10 @@ function App() {
                                     >
                                         Get History
                                     </Button>
-                                </div>
                             </div>
-                            
-                            {productHistory.length > 0 && (
+                        </div>
+                        
+                        {productHistory.length > 0 && (
                                 <div className="mt-8">
                                     <div className="flex items-center justify-between mb-6">
                                         <h3 className="text-xl font-semibold text-gray-800">
@@ -567,7 +567,7 @@ function App() {
                                     </div>
                                     
                                     <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-                                        <div className="overflow-x-auto">
+                               <div className="overflow-x-auto">
                                             <table className="min-w-full divide-y divide-gray-200">
                                                 <thead className="bg-gray-50">
                                                     <tr>
@@ -583,10 +583,10 @@ function App() {
                                                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                                             Transaction ID
                                                         </th>
-                                                    </tr>
-                                                </thead>
+                                           </tr>
+                                       </thead>
                                                 <tbody className="bg-white divide-y divide-gray-200">
-                                                    {productHistory.map((item, index) => (
+                                           {productHistory.map((item, index) => (
                                                         <tr key={index} className="hover:bg-gray-50">
                                                             <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                                                                 {item.record?.Owner || 'Unknown'}
@@ -600,14 +600,14 @@ function App() {
                                                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-mono">
                                                                 {item.txId ? item.txId.substring(0, 20) + '...' : 'N/A'}
                                                             </td>
-                                                        </tr>
-                                                    ))}
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    </div>
+                                               </tr>
+                                           ))}
+                                       </tbody>
+                                   </table>
+                               </div>
                                 </div>
-                            )}
+                            </div>
+                        )}
                         </div>
                     </Card>
                 )}
@@ -757,8 +757,8 @@ function App() {
                                     <p className="text-sm text-gray-600">Last Updated: <span className="font-semibold">{new Date().toLocaleString()}</span></p>
                                 </div>
                             </div>
-                        </Card>
-                    </div>
+                    </Card>
+                </div>
                 )}
             </main>
 
