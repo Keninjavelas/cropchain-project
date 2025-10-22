@@ -113,3 +113,8 @@ The `app.js` server exposes a set of REST API endpoints to interact with the sys
 | `GET` | `/api/products/:id/history` | **Query:** Retrieves the full, immutable on-chain transaction history for a product. |
 | `GET` | `/api/products/:id/qrcode` | **Utility:** Generates a QR code image linking to the product's history URL. |
 | `POST` | `/api/upload` | **File Storage:** Uploads a file (e.g., quality certificate) to **IPFS** and returns its hash. |
+
+
+## Current Display
+
+<img width="1907" height="909" alt="Screen" src="https://github.com/user-attachments/assets/53f071f1-86cd-4efe-a593-726db2f2d76f" />
