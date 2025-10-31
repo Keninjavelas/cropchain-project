@@ -7,6 +7,20 @@
 
 CropChain is a full-stack blockchain application demonstrating an agricultural product traceability solution using a hybrid approach. It leverages **Hyperledger Fabric** for an immutable audit trail, **MySQL** for scalable off-chain data storage, and **IPFS** for decentralized file storage.
 
+## 📸 Application Screenshots
+
+### Dashboard View
+
+![CropChain Dashboard](Dashboard.png)
+
+Main dashboard showing product overview and blockchain connectivity status.
+
+### Product Management Interface
+
+![Product Management](Management.png)
+
+Product management interface for creating, shipping, and tracking agricultural products.
+
 ## 🌟 Features
 
 - ✅ **Immutable Product Tracking** - Track agricultural products on the blockchain
@@ -383,4 +397,3 @@ This is an educational project. Feel free to fork and experiment!
 ---
 
 Built with ❤️ for Agricultural Supply Chain Traceability
-
