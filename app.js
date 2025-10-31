@@ -101,7 +101,7 @@ app.get('/api/products/:id/history', async (req, res) => {
             // Normalize keys for the UI
             record: item.record,
             txId: item.txId || item.TxId,
-            timestamp: item.timestamp || (item.Timestamp ? item.Timestamp : null)
+            timestamp: item.timestamp || item.Timestamp || null
         }));
         res.json({ history });
     } catch (error) {
@@ -162,17 +162,76 @@ async function initializeFabric() {
     const walletPath = path.join(__dirname, 'wallet');
     const wallet = await Wallets.newFileSystemWallet(walletPath);
 
-    const appUserIdentity = await wallet.get('appUser');
-    if (!appUserIdentity) {
-        console.log('An identity for "appUser" does not exist. Enrolling now...');
-        await enrollAppUser(ccp, wallet);
+    // Use the cryptogen-generated admin certificate instead of CA enrollment
+    const adminIdentity = await wallet.get('admin');
+    if (!adminIdentity) {
+        console.log('Importing Admin@org1.example.com identity from crypto-config...');
+        await importCryptoAdmin(wallet);
     }
 
     const gateway = new Gateway();
-    await gateway.connect(ccp, { wallet, identity: 'appUser', discovery: { enabled: true, asLocalhost: false } });
+    await gateway.connect(ccp, { 
+        wallet, 
+        identity: 'admin', 
+        discovery: { 
+            enabled: false,
+            asLocalhost: true 
+        } 
+    });
     const network = await gateway.getNetwork('cropchainchannel');
     fabricContract = network.getContract('cropchain');
     console.log('Fabric connection initialized successfully.');
+}
+
+async function importCryptoAdmin(wallet) {
+    try {
+        // Use the cryptogen-generated admin credentials
+        const credPath = path.join(__dirname, 'fabric-network', 'crypto-config', 'peerOrganizations', 'org1.example.com', 'users', 'Admin@org1.example.com');
+        const cert = fs.readFileSync(path.join(credPath, 'msp', 'signcerts', 'Admin@org1.example.com-cert.pem')).toString();
+        
+        // Find the private key file (it has a dynamic name ending with _sk)
+        const keyPath = path.join(credPath, 'msp', 'keystore');
+        const keyFiles = fs.readdirSync(keyPath);
+        const keyFile = keyFiles.find(f => f.endsWith('_sk'));
+        if (!keyFile) {
+            throw new Error('Private key file not found in keystore');
+        }
+        const privateKey = fs.readFileSync(path.join(keyPath, keyFile)).toString();
+
+        const x509Identity = {
+            credentials: {
+                certificate: cert,
+                privateKey: privateKey,
+            },
+            mspId: 'Org1MSP',
+            type: 'X.509',
+        };
+
+        await wallet.put('admin', x509Identity);
+        console.log('Successfully imported admin identity from crypto-config.');
+    } catch (error) {
+        console.error(`Failed to import admin identity: ${error}`);
+        throw error;
+    }
+}
+
+async function enrollAdmin(ccp, wallet) {
+    try {
+        const caInfo = ccp.certificateAuthorities['ca.org1.example.com'];
+        const caTLSCACerts = fs.readFileSync(caInfo.tlsCACerts.path, 'utf8');
+        const ca = new FabricCAServices(caInfo.url, { trustedRoots: caTLSCACerts, verify: false }, caInfo.caName);
+
+        const enrollment = await ca.enroll({ enrollmentID: 'admin', enrollmentSecret: 'adminpw' });
+        const x509Identity = {
+            credentials: { certificate: enrollment.certificate, privateKey: enrollment.key.toBytes() },
+            mspId: 'Org1MSP', type: 'X.509',
+        };
+        await wallet.put('admin', x509Identity);
+        console.log('Successfully enrolled and saved "admin" to wallet.');
+    } catch (error) {
+        console.error(`Failed to enroll admin: ${error}`);
+        throw error;
+    }
 }
 
 async function enrollAppUser(ccp, wallet) {
@@ -182,29 +241,28 @@ async function enrollAppUser(ccp, wallet) {
         const caTLSCACerts = fs.readFileSync(caInfo.tlsCACerts.path, 'utf8');
         const ca = new FabricCAServices(caInfo.url, { trustedRoots: caTLSCACerts, verify: false }, caInfo.caName);
 
-        const adminIdentity = await wallet.get('admin');
-        if (!adminIdentity) {
-            console.log('Enrolling admin user...');
-            const enrollment = await ca.enroll({ enrollmentID: 'admin', enrollmentSecret: 'adminpw' });
-            const x509Identity = {
-                credentials: { certificate: enrollment.certificate, privateKey: enrollment.key.toBytes() },
-                mspId: 'Org1MSP', type: 'X.509',
-            };
-            await wallet.put('admin', x509Identity);
-        }
-
         const adminUser = await wallet.get('admin');
         const provider = wallet.getProviderRegistry().getProvider(adminUser.type);
         const adminUserContext = await provider.getUserContext(adminUser, 'admin');
         
-        const secret = await ca.register({ affiliation: 'org1.department1', enrollmentID: 'appUser', role: 'client' }, adminUserContext);
-        const enrollment = await ca.enroll({ enrollmentID: 'appUser', enrollmentSecret: secret });
-        const x509Identity = {
-            credentials: { certificate: enrollment.certificate, privateKey: enrollment.key.toBytes() },
-            mspId: 'Org1MSP', type: 'X.509',
-        };
-        await wallet.put('appUser', x509Identity);
-        console.log('Successfully enrolled and saved "appUser" to wallet.');
+        try {
+            const secret = await ca.register({ affiliation: 'org1.department1', enrollmentID: 'appUser', role: 'client' }, adminUserContext);
+            const enrollment = await ca.enroll({ enrollmentID: 'appUser', enrollmentSecret: secret });
+            const x509Identity = {
+                credentials: { certificate: enrollment.certificate, privateKey: enrollment.key.toBytes() },
+                mspId: 'Org1MSP', type: 'X.509',
+            };
+            await wallet.put('appUser', x509Identity);
+            console.log('Successfully enrolled and saved "appUser" to wallet.');
+        } catch (registerError) {
+            // If user is already registered, try to enroll with a known password or use admin
+            if (registerError.toString().includes('is already registered')) {
+                console.log('appUser is already registered. Using admin identity instead.');
+                // Just skip - we'll use admin
+                return;
+            }
+            throw registerError;
+        }
     } catch (error) {
         console.error(`Failed to enroll app user: ${error}`);
         throw error;

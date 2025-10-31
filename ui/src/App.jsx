@@ -301,6 +301,7 @@ function App() {
             const res = await axios.get('/api/products/queryAll');
             setAllProducts(res.data || []);
         } catch (error) {
+            // eslint-disable-next-line no-console
             console.error('Error fetching products:', error);
             setAllProducts([]);
         }
@@ -317,6 +318,7 @@ function App() {
     useEffect(() => {
         // Only fetch products, don't auto-connect blockchain
         fetchAllProducts();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     const tabs = [
