@@ -383,3 +383,4 @@ This is an educational project. Feel free to fork and experiment!
 ---
 
 Built with ❤️ for Agricultural Supply Chain Traceability
+
